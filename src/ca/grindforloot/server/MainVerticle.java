@@ -3,9 +3,12 @@ package ca.grindforloot.server;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
+import org.bson.types.ObjectId;
+
 import com.mongodb.client.MongoClient;
 
 import ca.grindforloot.server.actions.Action;
+import ca.grindforloot.server.errors.UserError;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.NetServer;
@@ -24,6 +27,8 @@ public class MainVerticle extends GFLVerticle{
 		
 		
 		vertx.deployVerticle(new MainVerticle(env));
+		
+		System.out.println(new ObjectId());
 		
 	}
 	
@@ -48,6 +53,12 @@ public class MainVerticle extends GFLVerticle{
 					
 					Action action = (Action) cons.newInstance(socket, incoming);
 					
+					try {
+						action.perform();
+					}
+					catch(UserError e){
+						
+					}
 					
 				} catch (ClassNotFoundException | NoSuchMethodException | SecurityException | InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
 					//TODO log it.
