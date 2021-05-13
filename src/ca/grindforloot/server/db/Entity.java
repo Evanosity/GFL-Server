@@ -1,5 +1,8 @@
 package ca.grindforloot.server.db;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.bson.Document;
 
 public abstract class Entity {
@@ -30,15 +33,32 @@ public abstract class Entity {
 		raw.put(key, value);
 	}
 	
+	/**
+	 * Embeds a key onto an entity
+	 * @param property
+	 * @param key
+	 */
 	protected void setKeyValue(String property, Key key) {
 		raw.put(property, db.keyToDocument(key));
 	}
 	
-	//TODO
-	protected void setArrayValue(String property, List<?> value) {
+	protected Key getKeyValue(String property) {
+		Document rawKey = (Document) raw.get(property);
+		
+		return db.documentToKey(rawKey);
 		
 	}
 	
+	protected <T> void setListValue(String property, List<T> list) {
+		//TODO what if T is a key?
+		raw.put(property, list);
+	}
+	
+	protected <T> List<T> getListValue(String property, Class<T> clazz){
+		return raw.getList(property, clazz, new ArrayList<T>());
+		//TODO what if T is a key?
+	}
+		
 	public boolean hasValue(String key) {
 		return raw.containsKey(key);
 	}

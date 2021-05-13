@@ -17,6 +17,7 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 
 import ca.grindforloot.server.Utils;
+import ca.grindforloot.server.Utils.Duple;
 
 /**
  * TODO
@@ -28,6 +29,12 @@ import ca.grindforloot.server.Utils;
 public class DBService {
 	final MongoClient client;
 	final MongoDatabase db;
+	
+	public enum FilterOperator {
+		EQUAL, NOT_EQUAL, GREATER, GREATER_EQUAL, LESS, LESS_EQUAL
+	}
+	
+	
 	public DBService(MongoClient client) {
 		this.client = client;
 		//db = client.getDatabase("GFL");
@@ -70,6 +77,13 @@ public class DBService {
 		return result;
 	}
 	
+	protected Key documentToKey(Document doc) {
+		String type = doc.getString("type");
+		String id = doc.getString("id");
+		
+		return getKey(type, id);
+	}
+	
 	/**
 	 * Create a new, blank entity.
 	 * TODO generate a key with a unique identifier
@@ -109,9 +123,9 @@ public class DBService {
 		MongoCollection<Document> col = db.getCollection(ent.getType());
 		
 		if(ent.isNew())
-			col.updateOne(getFilterForId(ent.getId()), ent.raw);
-		else {
 			col.insertOne(ent.raw);
+		else {
+			col.replaceOne(getFilterForId(ent.getId()), ent.raw);
 		}
 	}
 	/**
@@ -131,6 +145,10 @@ public class DBService {
 	public void delete(Key key) {
 		db.getCollection(key.getType()).deleteOne(getFilterForId(key.getId()));
 	}
+	/**
+	 * this is inefficient AF. if youre gonna be deleting entities en masse, delete them with a Bson Filter.
+	 * @param keys
+	 */
 	public void delete(Iterable<Key> keys) {
 		for(Key key : keys) {
 			db.getCollection(key.getType()).deleteOne(getFilterForId(key.getId()));
@@ -162,7 +180,7 @@ public class DBService {
 	 * @param filter
 	 * @return
 	 */
-	private List<Entity> fetchInternal(String type, Bson filter){
+	protected List<Entity> fetchInternal(String type, Bson filter){
 		List<Document> rawList = fetchRawInternal(type, filter);
 		List<Entity> result = new ArrayList<>();
 		
@@ -192,6 +210,54 @@ public class DBService {
 		}
 		
 		return result;
+	}
+	
+	/**
+	 * Generate a composite bson filter
+	 * TODO helper methods for queries
+	 * @param filters a string-object-filteroperator map of the filters.
+	 * @return the composed Bson
+	 */
+	protected Bson generatedFilter(Map<String, Duple<Object, FilterOperator>> filters) {
+		
+		List<Bson> builtFilters = new ArrayList<>();
+		
+		for(Entry<String, Duple<Object, FilterOperator>> entry : filters.entrySet()) {
+			String type = entry.getKey();
+			Duple<Object, FilterOperator> rawFilter = entry.getValue();
+			
+			builtFilters.add(generateFilter(type, rawFilter.getValue(), rawFilter.getKey()));
+		}
+				
+		//Compose the final filter.
+		//TODO clean this up maybe?
+		return Filters.and(builtFilters.toArray(new Bson[builtFilters.size()]));
+	}
+	
+	/**
+	 * Generate a SINGLE bson filter
+	 * @param fieldName - the field we're operating for
+	 * @param op - the FilterOperator we're using(Equal, Not equal, etc)
+	 * @param value - the value we're comparing against
+	 * @return
+	 */
+	protected Bson generateFilter(String fieldName, FilterOperator op, Object value) {
+		switch(op) {
+		case EQUAL:
+			return Filters.eq(fieldName, value);
+		case NOT_EQUAL:
+			return Filters.ne(fieldName, value);
+		case GREATER:
+			return Filters.gt(fieldName, value);
+		case GREATER_EQUAL:
+			return Filters.gte(fieldName, value);
+		case LESS:
+			return Filters.lt(fieldName, value);
+		case LESS_EQUAL:
+			return Filters.lte(fieldName, value);
+		default:
+			throw new IllegalArgumentException("Invalid filter operator");
+		}
 	}
 	
 	/**
