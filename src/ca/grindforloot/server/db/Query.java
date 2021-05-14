@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import ca.grindforloot.server.Duple;
-import ca.grindforloot.server.db.DBService.FilterOperator;
+import ca.grindforloot.server.db.QueryService.FilterOperator;
 
 /**
  * This stores information about a query before it is executed. A logical building block in efficient queries
@@ -13,7 +13,7 @@ import ca.grindforloot.server.db.DBService.FilterOperator;
  */
 public class Query {
 	protected Map<String, Duple<FilterOperator, Object>> filters = new HashMap<>();
-	protected Map<String, Object> modifyQueryValues = new HashMap<>();
+	protected Map<String, Object> updates = new HashMap<>();
 	
 	private final String type;
 	
@@ -32,9 +32,9 @@ public class Query {
 	 * @param newValue
 	 * @return itself
 	 */
-	public Query addModifyQueryValue(String propertyName, Object newValue) {
+	public Query addUpdate(String propertyName, Object newValue) {
 		
-		modifyQueryValues.put(propertyName, newValue);
+		updates.put(propertyName, newValue);
 		
 		return this;
 	}
@@ -44,8 +44,8 @@ public class Query {
 	 * @param propertyName
 	 * @return itself
 	 */
-	public Query removeModifyQueryValue(String propertyName) {
-		modifyQueryValues.remove(propertyName);
+	public Query removeUpdate(String propertyName) {
+		updates.remove(propertyName);
 		return this;
 	}
 	

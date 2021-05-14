@@ -10,7 +10,7 @@ public abstract class Entity {
 	protected Document raw;
 	private Key key;
 	
-	private boolean isNew = true;
+	private final boolean isNew;
 		
 	protected Entity(DBService db, Document raw) {
 		this.db = db;
@@ -39,13 +39,13 @@ public abstract class Entity {
 	 * @param key
 	 */
 	protected void setKeyValue(String property, Key key) {
-		raw.put(property, db.keyToDocument(key));
+		setValue(property, key.toDocument());
 	}
 	
 	protected Key getKeyValue(String property) {
-		Document rawKey = (Document) raw.get(property);
+		Document rawKey = (Document) getValue(property);
 		
-		return db.documentToKey(rawKey);
+		return new Key(rawKey);
 		
 	}
 	

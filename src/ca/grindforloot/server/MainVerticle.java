@@ -1,18 +1,12 @@
 package ca.grindforloot.server;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-
 import org.bson.types.ObjectId;
 
 import com.mongodb.client.MongoClient;
 
-import ca.grindforloot.server.actions.Action;
-import ca.grindforloot.server.errors.UserError;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.NetServer;
-import io.vertx.core.net.NetSocket;
 
 public class MainVerticle extends GFLVerticle{
 	
@@ -46,7 +40,7 @@ public class MainVerticle extends GFLVerticle{
 				
 				String actionName = incoming.getString("action");
 							
-				Action action = (Action) Utils.instantiate("ca.grindforloot.server.actions." + actionName, socket, incoming);
+				Utils.instantiate("ca.grindforloot.server.actions." + actionName, socket, incoming);
 			});
 		});
 		
