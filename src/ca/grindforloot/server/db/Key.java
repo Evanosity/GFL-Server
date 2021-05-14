@@ -1,10 +1,13 @@
 package ca.grindforloot.server.db;
 
 import org.bson.Document;
+import org.bson.types.ObjectId;
 
 /**
  * This contains an immutable reference to an Entity, by combining its type(collection) and id.
  * @author Evan
+ * 
+ * TODO consider if we want a method to encode the entire key
  *
  */
 public class Key {
@@ -17,6 +20,10 @@ public class Key {
 	protected Key(Document doc) {
 		type = doc.getString("type");
 		id = doc.getString("id");
+	}
+	protected Key(String type, ObjectId id) {
+		this.type = type;
+		this.id = id.toHexString();
 	}
 	
 	/**

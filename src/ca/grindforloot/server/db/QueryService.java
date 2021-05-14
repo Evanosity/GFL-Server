@@ -36,11 +36,16 @@ public class QueryService {
 		return db.fetchInternal(q.getType(), filter);
 	}
 	public void runDeleteQuery(Query q) {
+		Bson filter = generateCompositeFilter(q.filters);
 		
+		db.db.getCollection(q.getType()).deleteMany(filter);
 		
 	}
 	public void runUpdate(Query q) {
+		Bson filters = generateCompositeFilter(q.filters);
+		Bson updates = generateUpdates(q.updates);
 		
+		db.db.getCollection(q.getType()).updateMany(filters, updates);
 	}
 	
 	
@@ -100,7 +105,7 @@ public class QueryService {
 		case LESS_EQUAL:
 			return Filters.lte(fieldName, value);
 		default:
-			throw new IllegalArgumentException("Invalid filter operator");
+			throw new IllegalArgumentException("Invalid filter operator " + op.toString());
 		}
 	}
 	

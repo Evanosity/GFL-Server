@@ -22,16 +22,15 @@ import ca.grindforloot.server.Utils;
  * My goal is to not expose the MongoDB api outside of this package.
  * @author Evan
  *
+ * TODO consider caching the collections we've called?
+ *
  */
 public class DBService {
-	final MongoClient client;
-	final MongoDatabase db;
-	
-
-	
+	//private final MongoClient client;
+	protected final MongoDatabase db;
 	
 	public DBService(MongoClient client) {
-		this.client = client;
+		//this.client = client;
 		//db = client.getDatabase("GFL");
 		db = null;
 		
@@ -48,11 +47,10 @@ public class DBService {
 		ObjectId random = null;
 		
 		while(!resolved) {
-			 random = new ObjectId();
+			random = new ObjectId();
 			
-			//TODO ensure it was unique. Do we put it to the DB if it was, just to keep its spot?
-			
-			resolved = true;
+			if(fetchInternal(type, QueryService.getFilterForId(random.toHexString())).size() == 0)
+				resolved = true;
 		}
 		
 		
@@ -60,8 +58,7 @@ public class DBService {
 	}
 	
 	/**
-	 * Create a new, blank entity.
-	 * TODO generate a key with a unique identifier
+	 * Create a new, blank entity of the given type.
 	 * @param type
 	 * @return
 	 */
@@ -76,7 +73,9 @@ public class DBService {
 	}
 	
 	/**
-	 * Instantiates an entity object, given its type. Will implode if the type doesnt exist
+	 * Reflectively instantiates an entity object, given its type. Will implode if the type doesnt exist
+	 * I feel like I'm gonna regret doing this reflectively. Infact i feel like i'm gonna regret doing anything reflectively.
+	 * TODO consider if we want to be passing the type in here.
 	 * @param key
 	 * @param doc
 	 * @param isNew
@@ -96,11 +95,7 @@ public class DBService {
 	public void put(Entity ent) {
 		MongoCollection<Document> col = db.getCollection(ent.getType());
 		
-		if(ent.isNew())
-			col.insertOne(ent.raw);
-		else {
-			col.replaceOne(QueryService.getFilterForId(ent.getId()), ent.raw);
-		}
+		putInternal(ent, col);
 	}
 	/**
 	 * Insert a list of entities into the database
@@ -112,21 +107,44 @@ public class DBService {
 		for(Entry<String, List<Entity>> entry : sorted.entrySet()) {
 			MongoCollection<Document> col = db.getCollection(entry.getKey());
 						
-			col.insertMany(getRawEntities(entry.getValue()));
+			for(Entity ent : entry.getValue())
+				putInternal(ent, col);
 		}
+	}
+	
+	/**
+	 * Put an entity to the DB.
+	 * @param ent - the Entity to put
+	 * @param col - the MongoCollection we're putting this document to
+	 */
+	private void putInternal(Entity ent, MongoCollection<Document> col) {
+		if(ent.isNew())
+			col.insertOne(ent.raw);
+		else
+			col.replaceOne(QueryService.getFilterForId(ent.getId()), ent.raw);
 	}
 	
 	public void delete(Key key) {
 		db.getCollection(key.getType()).deleteOne(QueryService.getFilterForId(key.getId()));
 	}
 	/**
-	 * this is inefficient AF. if youre gonna be deleting entities en masse, delete them with a Bson Filter.
+	 * Delete a set of entiites by their key.
 	 * @param keys
 	 */
 	public void delete(Iterable<Key> keys) {
-		for(Key key : keys) {
-			db.getCollection(key.getType()).deleteOne(QueryService.getFilterForId(key.getId()));
+		
+		Map<String, List<Key>> sorted = sortKeysByType(keys);
+		
+		for(Entry<String, List<Key>> entry : sorted.entrySet()) {
+			MongoCollection<Document> col = db.getCollection(entry.getKey());
+			
+			for(Key key : entry.getValue())
+				deleteInternal(key, col);
 		}
+	}
+	
+	private void deleteInternal(Key key, MongoCollection<Document> col) {
+		col.deleteOne(QueryService.getFilterForId(key.getId()));
 	}
 	
 	public Entity getEntity(Key key) {
@@ -141,8 +159,8 @@ public class DBService {
 	}
 	
 	/**
-	 * Returns a list of built entities, given a type and a Bson Filter
-	 * The important part of this method is that we generate key objects for each parameter.
+	 * Returns a list of built entities, given a type and a Bson Filter. Any group fetch runs through this method.
+	 * We create the entities using this.
 	 * @param type
 	 * @param filter
 	 * @return
@@ -152,7 +170,7 @@ public class DBService {
 		List<Entity> result = new ArrayList<>();
 		
 		for(Document doc : rawList) {
-			Key key = new Key(type, doc.getObjectId("_id").toHexString());
+			Key key = new Key(type, doc.getObjectId("_id"));
 			
 			result.add(createEntityObject(key, doc));
 		}
@@ -161,20 +179,18 @@ public class DBService {
 	}
 	
 	/**
-	 * Fetches a list of documents from the DB, given a type and query.
-	 * @param type
+	 * Fetches a raw list of documents from the given collection
+	 * @param collection
 	 * @param filter
 	 * @return
 	 */
-	private List<Document> fetchRawInternal(String type, Bson filter){
-		MongoCollection<Document> col = db.getCollection(type);
+	private List<Document> fetchRawInternal(String collection, Bson filter){
 		List<Document> result = new ArrayList<>();
 		
-		FindIterable<Document> dbResult = col.find(filter);
+		FindIterable<Document> dbResult = db.getCollection(collection).find(filter);
 		
-		for(Document doc : dbResult) {
+		for(Document doc : dbResult) 
 			result.add(doc);
-		}
 		
 		return result;
 	}
@@ -196,6 +212,8 @@ public class DBService {
 		
 	}
 	
+
+	
 	/**
 	 * Sorts a list of entities into a map of entity type-entity
 	 * @param ents
@@ -211,6 +229,22 @@ public class DBService {
 			if(current == null) current = new ArrayList<>();
 			
 			current.add(ent);
+			
+			result.put(type, current);
+		}
+		
+		return result;
+	}
+	private Map<String, List<Key>> sortKeysByType(Iterable<Key> keys){
+		Map<String, List<Key>> result = new HashMap<>();
+		
+		for(Key key : keys) {
+			String type = key.getType();
+			
+			List<Key> current = result.get(type);
+			if(current == null) current = new ArrayList<>();
+			
+			current.add(key);
 			
 			result.put(type, current);
 		}
