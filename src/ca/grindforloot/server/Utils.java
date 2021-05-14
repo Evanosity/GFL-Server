@@ -3,51 +3,37 @@ package ca.grindforloot.server;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
+/**
+ * Utility methods
+ * @author Evan
+ *
+ */
 public class Utils {
 	/**
-	 * reflect scares me
+	 * Given a path and parameters, reflectively instantiate an object.
+	 * This will throw a RuntimeException if the incorrect parameter types are passed in.
 	 * @param path
-	 * @param clazzParams
 	 * @param params
 	 * @return
 	 */
-	public static Object instantiate(String path, Class<?>[] clazzParams, Object[] params) {
+	public static Object instantiate(String path, Object... params) {
 		
 		try {
+			
+			Class<?>[]clazzes = new Class<?>[params.length];
+			
+			for(int a = 0; a != params.length; a++) 
+				clazzes[a] = params[a].getClass();
+			
+			
 			Class<?> clazz = Class.forName(path);
-			Constructor<?> cons = clazz.getConstructor(clazzParams);
+			Constructor<?> cons = clazz.getConstructor(clazzes);
 			
 			return cons.newInstance(params);
 			
 		} catch (ClassNotFoundException | NoSuchMethodException | SecurityException | InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
 			//TODO log it.
 			throw new RuntimeException("Attempted to instantiate class that does not exist");
-		}
-	}
-	
-	public class Duple<K, V>{
-		private K key;
-		private V value;
-		public Duple() {
-			
-		}
-		public Duple(K k, V value) {
-			this.key = k;
-			this.value = value;
-		}
-		
-		public K getKey() {
-			return key;
-		}
-		public void setKey(K newKey) {
-			key = newKey;
-		}
-		
-		public V getValue() {
-			return value;
-		}
-		public void setValue(V newValue) {
-			value = newValue;
 		}
 	}
 }

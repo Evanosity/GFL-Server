@@ -17,12 +17,11 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 
 import ca.grindforloot.server.Utils;
-import ca.grindforloot.server.Utils.Duple;
+import ca.grindforloot.server.Duple;
 
 /**
- * TODO
- * * everything marked todo
- * * figure out the data structure; one DB for the entire game, and then entity types as collections?
+ * The main point of access for DB Access.
+ * My goal is to not expose the MongoDB api outside of this package.
  * @author Evan
  *
  */
@@ -108,14 +107,13 @@ public class DBService {
 	 * @return
 	 */
 	protected Entity createEntityObject(Key key, Document doc, Boolean isNew) {
-		Class<?>[] clazzes = {DBService.class, Document.class, Boolean.class};
 		Object[] values = {this, doc, isNew};
-		
+				
 		try {
-			return (Entity) Utils.instantiate("com.grindforloot.entities." + key.getType(), clazzes, values);
+			return (Entity) Utils.instantiate("com.grindforloot.entities." + key.getType(), values);
 		}
 		catch(Exception e) {
-			throw new RuntimeException("Entity type " + key.getType() + " does not exist!");
+			throw new RuntimeException("Entity type " + key.getType() + " does not exist!" + e.getStackTrace());
 		}
 	}
 	
@@ -218,15 +216,15 @@ public class DBService {
 	 * @param filters a string-object-filteroperator map of the filters.
 	 * @return the composed Bson
 	 */
-	protected Bson generatedFilter(Map<String, Duple<Object, FilterOperator>> filters) {
+	protected Bson generateCompositeFilter(Map<String, Duple<FilterOperator, Object>> filters) {
 		
 		List<Bson> builtFilters = new ArrayList<>();
 		
-		for(Entry<String, Duple<Object, FilterOperator>> entry : filters.entrySet()) {
+		for(Entry<String, Duple<FilterOperator, Object>> entry : filters.entrySet()) {
 			String type = entry.getKey();
-			Duple<Object, FilterOperator> rawFilter = entry.getValue();
+			Duple<FilterOperator, Object> rawFilter = entry.getValue();
 			
-			builtFilters.add(generateFilter(type, rawFilter.getValue(), rawFilter.getKey()));
+			builtFilters.add(generateFilter(type, rawFilter.getKey(), rawFilter.getValue()));
 		}
 				
 		//Compose the final filter.

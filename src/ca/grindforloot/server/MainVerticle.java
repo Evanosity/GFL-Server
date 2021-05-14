@@ -41,29 +41,12 @@ public class MainVerticle extends GFLVerticle{
 		//connection comes in
 		server.connectHandler(socket -> {
 			
-			//we add a handler for the socket.
 			socket.handler(buffer -> {		
 				JsonObject incoming = buffer.toJsonObject();
 				
 				String actionName = incoming.getString("action");
-								
-				try {
-					Class<?> clazz = Class.forName("ca.grindforloot.server.actions." + actionName);
-					Constructor<?> cons = clazz.getConstructor(NetSocket.class, JsonObject.class);
-					
-					Action action = (Action) cons.newInstance(socket, incoming);
-					
-					try {
-						action.perform();
-					}
-					catch(UserError e){
-						
-					}
-					
-				} catch (ClassNotFoundException | NoSuchMethodException | SecurityException | InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-					//TODO log it.
-					throw new RuntimeException("Attempted to instantiate action that does not exist");
-				}
+							
+				Action action = (Action) Utils.instantiate("ca.grindforloot.server.actions." + actionName, socket, incoming);
 			});
 		});
 		
