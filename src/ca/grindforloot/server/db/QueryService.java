@@ -49,6 +49,11 @@ public class QueryService {
 		
 		db.db.getCollection(q.getType()).updateMany(filters, updates);
 	}
+	public Long runCount(Query q) {
+		Bson filters = generateCompositeFilter(q.filters);
+		
+		return db.db.getCollection(q.getType()).countDocuments(filters);
+	}
 	
 	protected static Bson generateProjections(Set<String> projections) {
 		

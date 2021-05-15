@@ -16,6 +16,7 @@ import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
 
 import ca.grindforloot.server.Utils;
 
@@ -50,6 +51,10 @@ public class DBService {
 		
 		while(!resolved) {
 			random = new ObjectId();
+			
+			Query q = new Query(type);
+			
+			//TODO consider this
 			
 			if(fetchInternal(type, QueryService.getFilterForId(random.toHexString())).size() == 0)
 				resolved = true;
@@ -186,6 +191,39 @@ public class DBService {
 		col.deleteOne(QueryService.getFilterForId(key.getId()));
 	}
 	
+	/**
+	 * Fetch a list of entities from a list of keys.
+	 * @param keys
+	 * @return
+	 */
+	public List<Entity> getEntities(Iterable<Key> keys){
+		List<Entity> result = new ArrayList<>();
+		
+		Map<String, List<Key>> sorted = sortKeysByType(keys);
+		
+		for(Entry<String, List<Key>> entry : sorted.entrySet()) {
+			String type = entry.getKey();
+			List<ObjectId> ids = new ArrayList<>();
+
+			for(Key key : entry.getValue()) 
+				ids.add(new ObjectId(key.getId()));
+			
+			Bson filter = Filters.in("_id", ids);
+			
+			MongoCollection<Document> col = db.getCollection(type);
+			
+			for(Document doc : col.find(filter)) 
+				result.add(createEntityObject(new Key(type, doc.getObjectId("_id")), doc));
+		}
+		
+		return result;
+	}
+	
+	/**
+	 * Fetch a single entity from a key.
+	 * @param key
+	 * @return
+	 */
 	public Entity getEntity(Key key) {
 		
 		List<Document> docs = fetchRawInternal(key.getType(), QueryService.getFilterForId(key.getId()), null);
@@ -193,8 +231,7 @@ public class DBService {
 		if(docs.size() != 1)
 			throw new IllegalStateException("cant have multiple docs with the same identifier. delete this project.");
 		
-		return createEntityObject(key, docs.get(0));
-		
+		return createEntityObject(key, docs.get(0));	
 	}
 	
 	/**

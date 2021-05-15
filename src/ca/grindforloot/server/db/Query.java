@@ -21,7 +21,7 @@ public class Query {
 	private final String type;
 	
 	
-	public Query(DBService db, String type) {
+	public Query(String type) {
 		this.type = type;
 	}
 	

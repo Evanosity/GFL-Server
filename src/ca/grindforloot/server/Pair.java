@@ -10,7 +10,7 @@ package ca.grindforloot.server;
 public class Pair<K, V>{
 	private K key;
 	private V value;
-	public Pair() {		
+	public Pair() {	
 	}
 	public Pair(K k, V value) {
 		this.key = k;
