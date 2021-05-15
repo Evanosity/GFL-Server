@@ -4,14 +4,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 
-import ca.grindforloot.server.Duple;
+import ca.grindforloot.server.Pair;
 
 
 /**
@@ -31,9 +33,9 @@ public class QueryService {
 	}
 	
 	public List<Entity> runEntityQuery(Query q){	
-		Bson filter = generateCompositeFilter(q.filters);
+		Bson filter = generateCompositeFilter(q.filters); 
 		
-		return db.fetchInternal(q.getType(), filter);
+		return db.fetchInternal(q.getType(), filter, q.projections);
 	}
 	public void runDeleteQuery(Query q) {
 		Bson filter = generateCompositeFilter(q.filters);
@@ -48,18 +50,33 @@ public class QueryService {
 		db.db.getCollection(q.getType()).updateMany(filters, updates);
 	}
 	
+	protected static Bson generateProjections(Set<String> projections) {
+		
+		return Projections.include(projections.toArray(new String[projections.size()]));	
+	}
 	
 	protected static Bson generateUpdates(Map<String, Object> updates) {
 		List<Bson> bsonUpdates = new ArrayList<>();
 		
 		for(Entry<String, Object> entry : updates.entrySet()) 
-			Updates.set(entry.getKey(), entry.getValue());
+			bsonUpdates.add(Updates.set(entry.getKey(), entry.getValue()));
 		
 		
 		return Updates.combine(bsonUpdates);
 	}
 	
+	
+	
 	//********** FILTERS **********
+	
+	/**
+	 * Generates a Bson filter for a singular ID.
+	 * @param id
+	 * @return
+	 */
+	protected static Bson getFilterForId(String id) {
+		return Filters.eq("_id", new ObjectId(id));
+	}
 	
 	/**
 	 * Generate a composite bson filter
@@ -67,13 +84,13 @@ public class QueryService {
 	 * @param a string-<filteroperator-object> map of the filters. see Query and QueryService for impl
 	 * @return the composed Bson
 	 */
-	protected static Bson generateCompositeFilter(Map<String, Duple<FilterOperator, Object>> filters) {
+	protected static Bson generateCompositeFilter(Map<String, Pair<FilterOperator, Object>> filters) {
 		
 		List<Bson> builtFilters = new ArrayList<>();
 		
-		for(Entry<String, Duple<FilterOperator, Object>> entry : filters.entrySet()) {
+		for(Entry<String, Pair<FilterOperator, Object>> entry : filters.entrySet()) {
 			String type = entry.getKey();
-			Duple<FilterOperator, Object> rawFilter = entry.getValue();
+			Pair<FilterOperator, Object> rawFilter = entry.getValue();
 			
 			builtFilters.add(generateFilter(type, rawFilter.getKey(), rawFilter.getValue()));
 		}
@@ -107,14 +124,5 @@ public class QueryService {
 		default:
 			throw new IllegalArgumentException("Invalid filter operator " + op.toString());
 		}
-	}
-	
-	/**
-	 * Generates a Bson filter for a singular ID.
-	 * @param id
-	 * @return
-	 */
-	protected static Bson getFilterForId(String id) {
-		return Filters.eq("_id", new ObjectId(id));
 	}
 }

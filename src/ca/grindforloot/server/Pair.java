@@ -7,13 +7,12 @@ package ca.grindforloot.server;
  * @param <K>
  * @param <V>
  */
-public class Duple<K, V>{
+public class Pair<K, V>{
 	private K key;
 	private V value;
-	public Duple() {
-		
+	public Pair() {		
 	}
-	public Duple(K k, V value) {
+	public Pair(K k, V value) {
 		this.key = k;
 		this.value = value;
 	}

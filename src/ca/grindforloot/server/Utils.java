@@ -1,7 +1,6 @@
 package ca.grindforloot.server;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -34,7 +33,6 @@ public class Utils {
 		return false;
 	}
 	
-	private static Map<String, Constructor<?>> constructorCache = new ConcurrentHashMap<>();	
 	/**
 	 * Given a path and parameters, reflectively instantiate an object.
 	 * This will throw a RuntimeException if the incorrect parameter types are passed in.
@@ -43,6 +41,7 @@ public class Utils {
 	 * @param params
 	 * @return
 	 */
+	private static Map<String, Constructor<?>> constructorCache = new ConcurrentHashMap<>();	
 	public static Object instantiate(String path, Object... params) {
 		
 		try {
@@ -64,7 +63,7 @@ public class Utils {
 			
 			return cons.newInstance(params);
 			
-		} catch (ClassNotFoundException | NoSuchMethodException | SecurityException | InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+		} catch (Exception e) {
 			//TODO log it.
 			throw new RuntimeException("Error while instantiating " + path + " Stacktrace: " + e.getStackTrace());
 		}

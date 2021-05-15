@@ -2,9 +2,11 @@ package ca.grindforloot.server.db;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -65,24 +67,41 @@ public class DBService {
 	public Entity createEntity(String type) {
 		Key key = generateKey(type);
 		
-		return createEntityObject(key, new Document(), true);
+		return createEntityObject(key, new Document(), true, new HashSet<>());
 	}
 	
+	/**
+	 * Builds an Entity object from a document. No projections
+	 * @param key
+	 * @param doc
+	 * @return
+	 */
 	protected Entity createEntityObject(Key key, Document doc) {
-		return createEntityObject(key, doc, false);
+		return createEntityObject(key, doc, false, new HashSet<>());
+	}
+	
+	/**
+	 * Builds an Entity object from a document with projections
+	 * @param key
+	 * @param doc
+	 * @param projections
+	 * @return
+	 */
+	protected Entity createEntityObject(Key key, Document doc, Set<String> projections) {
+		return createEntityObject(key, doc, false, projections);
 	}
 	
 	/**
 	 * Reflectively instantiates an entity object, given its type. Will implode if the type doesnt exist
 	 * I feel like I'm gonna regret doing this reflectively. Infact i feel like i'm gonna regret doing anything reflectively.
-	 * TODO consider if we want to be passing the type in here.
 	 * @param key
 	 * @param doc
 	 * @param isNew
+	 * @param projections
 	 * @return
 	 */
-	protected Entity createEntityObject(Key key, Document doc, Boolean isNew) {
-		Object[] values = {this, doc, isNew};
+	private Entity createEntityObject(Key key, Document doc, Boolean isNew, Set<String> projections) {
+		Object[] values = {this, doc, isNew, projections};
 				
 		try {
 			return (Entity) Utils.instantiate("com.grindforloot.entities." + key.getType(), values);
@@ -92,6 +111,10 @@ public class DBService {
 		}
 	}
 	
+	/**
+	 * Inserts a single entity into the DB
+	 * @param ent
+	 */
 	public void put(Entity ent) {
 		MongoCollection<Document> col = db.getCollection(ent.getType());
 		
@@ -124,11 +147,22 @@ public class DBService {
 			col.replaceOne(QueryService.getFilterForId(ent.getId()), ent.raw);
 	}
 	
+	public void deleteEntity(Entity ent) {		
+		delete(ent.getKey());
+	}
 	public void delete(Key key) {
-		db.getCollection(key.getType()).deleteOne(QueryService.getFilterForId(key.getId()));
+		MongoCollection<Document> col = db.getCollection(key.getType());
+		
+		deleteInternal(key, col);
+	}
+	
+	public void deleteEntity(Iterable<Entity> entities) {
+		List<Key> keys = getKeysFromEntities(entities);
+		
+		delete(keys);
 	}
 	/**
-	 * Delete a set of entiites by their key.
+	 * Delete a set of entities by their key.
 	 * @param keys
 	 */
 	public void delete(Iterable<Key> keys) {
@@ -143,13 +177,18 @@ public class DBService {
 		}
 	}
 	
+	/**
+	 * Delete a key from the DB
+	 * @param key
+	 * @param col
+	 */
 	private void deleteInternal(Key key, MongoCollection<Document> col) {
 		col.deleteOne(QueryService.getFilterForId(key.getId()));
 	}
 	
 	public Entity getEntity(Key key) {
 		
-		List<Document> docs = fetchRawInternal(key.getType(), QueryService.getFilterForId(key.getId()));
+		List<Document> docs = fetchRawInternal(key.getType(), QueryService.getFilterForId(key.getId()), null);
 		
 		if(docs.size() != 1)
 			throw new IllegalStateException("cant have multiple docs with the same identifier. delete this project.");
@@ -159,19 +198,33 @@ public class DBService {
 	}
 	
 	/**
-	 * Returns a list of built entities, given a type and a Bson Filter. Any group fetch runs through this method.
-	 * We create the entities using this.
+	 * returns a list of built entities, given a type and a bson filter.
 	 * @param type
 	 * @param filter
 	 * @return
 	 */
 	protected List<Entity> fetchInternal(String type, Bson filter){
-		List<Document> rawList = fetchRawInternal(type, filter);
+		return fetchInternal(type, filter, null);
+	}
+	
+	/**
+	 * Returns a list of built entities, given a type and a Bson Filter. Any group fetch runs through this method.
+	 * We create the entities using this.
+	 * @param type - the entity type we're fetching
+	 * @param filter - the composed bson filter
+	 * @param projections - a set of the fields we're projection. This can be null.
+	 * @return
+	 */
+	protected List<Entity> fetchInternal(String type, Bson filter, Set<String> projections){
+		
+		Bson composedProj = QueryService.generateProjections(projections);
+		
+		List<Document> rawList = fetchRawInternal(type, filter, composedProj);
 		List<Entity> result = new ArrayList<>();
 		
 		for(Document doc : rawList) {
 			Key key = new Key(type, doc.getObjectId("_id"));
-			
+						
 			result.add(createEntityObject(key, doc));
 		}
 		
@@ -179,15 +232,16 @@ public class DBService {
 	}
 	
 	/**
-	 * Fetches a raw list of documents from the given collection
-	 * @param collection
-	 * @param filter
+	 * Fetches a raw list of documents from the given collection.
+	 * @param collection - the type of entity
+	 * @param filter - the composed Bson filters
+	 * @param projections - the composed Bson projections
 	 * @return
 	 */
-	private List<Document> fetchRawInternal(String collection, Bson filter){
+	private List<Document> fetchRawInternal(String collection, Bson filter, Bson projections){
 		List<Document> result = new ArrayList<>();
 		
-		FindIterable<Document> dbResult = db.getCollection(collection).find(filter);
+		FindIterable<Document> dbResult = db.getCollection(collection).find(filter).projection(projections);
 		
 		for(Document doc : dbResult) 
 			result.add(doc);
@@ -195,21 +249,35 @@ public class DBService {
 		return result;
 	}
 	
-
+	
+	//Below this point are helper methods for sorting entities and extracting information from a collection of entities
+	
+	/**
+	 * Extracts a list of keys from a list of entities
+	 * @param entities
+	 * @return
+	 */
+	public List<Key> getKeysFromEntities(Iterable<Entity> entities){
+		List<Key> result = new ArrayList<>();
+		
+		for(Entity ent : entities)
+			result.add(ent.getKey());
+		
+		return result;
+	}
 	
 	/**
 	 * Extracts a list of documents from a list of entities
 	 * @param entities
 	 * @return
 	 */
-	private List<Document> getRawEntities(List<Entity> entities){
+	protected List<Document> getRawEntities(Iterable<Entity> entities){
 		List<Document> result = new ArrayList<>();
 		
 		for(Entity ent : entities) 
 			result.add(ent.raw);
 		
 		return result;
-		
 	}
 	
 

@@ -1,9 +1,11 @@
 package ca.grindforloot.server.db;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
-import ca.grindforloot.server.Duple;
+import ca.grindforloot.server.Pair;
 import ca.grindforloot.server.db.QueryService.FilterOperator;
 
 /**
@@ -12,8 +14,9 @@ import ca.grindforloot.server.db.QueryService.FilterOperator;
  *
  */
 public class Query {
-	protected Map<String, Duple<FilterOperator, Object>> filters = new HashMap<>();
+	protected Map<String, Pair<FilterOperator, Object>> filters = new HashMap<>();
 	protected Map<String, Object> updates = new HashMap<>();
+	protected Set<String> projections = new HashSet<>();
 	
 	private final String type;
 	
@@ -49,6 +52,18 @@ public class Query {
 		return this;
 	}
 	
+	public Query addProjection(String propertyName) {
+		projections.add(propertyName);
+		
+		return this;
+	}
+	
+	public Query removeProjection(String propertyName) {
+		projections.remove(propertyName);
+		
+		return this;
+	}
+	
 	/**
 	 * 
 	 * @param propertyName
@@ -57,7 +72,7 @@ public class Query {
 	 * @return itself
 	 */
 	public Query addFilter(String propertyName, FilterOperator operator, Object value) {
-		Duple<FilterOperator, Object> duple = new Duple<>(operator, value);
+		Pair<FilterOperator, Object> duple = new Pair<>(operator, value);
 		
 		filters.put(propertyName, duple);
 		
