@@ -17,7 +17,11 @@ import ca.grindforloot.server.Pair;
 
 
 /**
- * Contains helper methods for BSON
+ * Wraps DB service to allow Query objects to be passed in. 
+ * This service should be used when you <i>don't</i> have the key(s) of entities you want to retrieve.
+ * If you do, use {@link DBService.getEntity} and {@link DBService.getEntities}
+ * TODO those links are toast rip
+ * 
  * @author Evan
  *
  */
@@ -30,6 +34,20 @@ public class QueryService {
 	
 	public QueryService(DBService db) {
 		this.db = db;
+	}
+	
+	public List<Entity> fetchEntites(String type, String field, FilterOperator op, Object value){
+		Query q = new Query(type);
+		q.addFilter(field, op, value);
+		
+		return runEntityQuery(q);
+	}
+	
+	public Long countEntities(String type, String field, FilterOperator op, Object value) {
+		Query q = new Query(type);
+		q.addFilter(field, op, value);
+		
+		return runCount(q);
 	}
 	
 	public List<Entity> runEntityQuery(Query q){	

@@ -12,12 +12,15 @@ import io.vertx.core.json.JsonObject;
 /**
  * Abstract class, the root of the entity system. Wraps a MongoDB Document with helper methods
  * 
- * All subclasses should implement every constructor, otherwise there might be.... issues. TODO ditch reflect
+ * All subclasses should implement every constructor.
+ * 
+ * You do NOT need to provide a key object to this entity; it gets generated upon creation.
+ * 
  * @author Evan
  *
  */
 public abstract class Entity {
-	public DBService db;
+	protected DBService db;
 	protected Document raw;
 	private final Key key;
 	private final Set<String> projections;
@@ -40,7 +43,7 @@ public abstract class Entity {
 	}
 	
 	//internal constructor
-	private Entity(DBService db, Document raw, boolean isNew, Set<String> projections) {
+	protected Entity(DBService db, Document raw, boolean isNew, Set<String> projections) {
 		this.db = db;
 		this.raw = raw;
 		this.isNew = isNew;
@@ -123,7 +126,7 @@ public abstract class Entity {
 	 * Create a Vert.x JsonObject representation of this entity
 	 * @return
 	 */
-	protected JsonObject toJson() {
+	public JsonObject toJson() {
 		JsonObject result = new JsonObject();
 		
 		for(Entry<String, Object> entry : raw.entrySet())

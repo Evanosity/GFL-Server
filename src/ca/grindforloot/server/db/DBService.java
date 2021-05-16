@@ -19,6 +19,8 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 
 import ca.grindforloot.server.Utils;
+import ca.grindforloot.server.entities.*;
+import ca.grindforloot.server.entities.Character;
 
 /**
  * The main point of access for DB Access.
@@ -31,11 +33,14 @@ import ca.grindforloot.server.Utils;
 public class DBService {
 	//private final MongoClient client;
 	protected final MongoDatabase db;
+	private final EntityService entityService;
 	
 	public DBService(MongoClient client) {
 		//this.client = client;
 		//db = client.getDatabase("GFL");
 		db = null;
+		
+		entityService = new EntityService(this);
 		
 	}
 	
@@ -62,58 +67,6 @@ public class DBService {
 		
 		
 		return new Key(type, random.toHexString());
-	}
-	
-	/**
-	 * Create a new, blank entity of the given type.
-	 * @param type
-	 * @return
-	 */
-	public Entity createEntity(String type) {
-		Key key = generateKey(type);
-		
-		return createEntityObject(key, new Document(), true, new HashSet<>());
-	}
-	
-	/**
-	 * Builds an Entity object from a document. No projections
-	 * @param key
-	 * @param doc
-	 * @return
-	 */
-	protected Entity createEntityObject(Key key, Document doc) {
-		return createEntityObject(key, doc, false, new HashSet<>());
-	}
-	
-	/**
-	 * Builds an Entity object from a document with projections
-	 * @param key
-	 * @param doc
-	 * @param projections
-	 * @return
-	 */
-	protected Entity createEntityObject(Key key, Document doc, Set<String> projections) {
-		return createEntityObject(key, doc, false, projections);
-	}
-	
-	/**
-	 * Reflectively instantiates an entity object, given its type. Will implode if the type doesnt exist
-	 * I feel like I'm gonna regret doing this reflectively. Infact i feel like i'm gonna regret doing anything reflectively.
-	 * @param key
-	 * @param doc
-	 * @param isNew
-	 * @param projections
-	 * @return
-	 */
-	private Entity createEntityObject(Key key, Document doc, Boolean isNew, Set<String> projections) {
-		Object[] values = {this, doc, isNew, projections};
-				
-		try {
-			return (Entity) Utils.instantiate("com.grindforloot.entities." + key.getType(), values);
-		}
-		catch(Exception e) {
-			throw new RuntimeException("Entity type " + key.getType() + " does not exist!" + e.getStackTrace());
-		}
 	}
 	
 	/**
@@ -213,7 +166,7 @@ public class DBService {
 			MongoCollection<Document> col = db.getCollection(type);
 			
 			for(Document doc : col.find(filter)) 
-				result.add(createEntityObject(new Key(type, doc.getObjectId("_id")), doc));
+				result.add(entityService.createEntityObject(new Key(type, doc.getObjectId("_id")), doc));
 		}
 		
 		return result;
@@ -224,14 +177,14 @@ public class DBService {
 	 * @param key
 	 * @return
 	 */
-	public Entity getEntity(Key key) {
+	public <T extends Entity> T getEntity(Key key) {
 		
 		List<Document> docs = fetchRawInternal(key.getType(), QueryService.getFilterForId(key.getId()), null);
 		
 		if(docs.size() != 1)
 			throw new IllegalStateException("cant have multiple docs with the same identifier. delete this project.");
 		
-		return createEntityObject(key, docs.get(0));	
+		return entityService.createEntityObject(key, docs.get(0));	
 	}
 	
 	/**
@@ -262,7 +215,7 @@ public class DBService {
 		for(Document doc : rawList) {
 			Key key = new Key(type, doc.getObjectId("_id"));
 						
-			result.add(createEntityObject(key, doc));
+			result.add(entityService.createEntityObject(key, doc));
 		}
 		
 		return result;
@@ -316,8 +269,6 @@ public class DBService {
 		
 		return result;
 	}
-	
-
 	
 	/**
 	 * Sorts a list of entities into a map of entity type-entity
