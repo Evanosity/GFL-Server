@@ -17,10 +17,8 @@ import ca.grindforloot.server.Pair;
 
 
 /**
- * Wraps DB service to allow Query objects to be passed in. 
- * This service should be used when you <i>don't</i> have the key(s) of entities you want to retrieve.
- * If you do, use {@link DBService.getEntity} and {@link DBService.getEntities}
- * TODO those links are toast rip
+ * An extension of {@link DBService} that facilitates {@link Query} objects.
+ * Also contains helper methods for composing Bson filters
  * 
  * @author Evan
  *
@@ -50,7 +48,7 @@ public class QueryService {
 		return runCount(q);
 	}
 	
-	public List<Entity> runEntityQuery(Query q){	
+	public <T extends Entity> List<T> runEntityQuery(Query q){	
 		Bson filter = generateCompositeFilter(q.filters); 
 		
 		return db.fetchInternal(q.getType(), filter, q.projections);
@@ -98,7 +96,7 @@ public class QueryService {
 	 * @return
 	 */
 	protected static Bson getFilterForId(String id) {
-		return Filters.eq("_id", new ObjectId(id));
+		return generateFilter("_id", FilterOperator.EQUAL, new ObjectId(id));
 	}
 	
 	/**
@@ -119,7 +117,6 @@ public class QueryService {
 		}
 				
 		//Compose the final filter.
-		//TODO clean this up maybe?
 		return Filters.and(builtFilters.toArray(new Bson[builtFilters.size()]));
 	}
 	

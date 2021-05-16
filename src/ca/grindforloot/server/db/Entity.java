@@ -59,8 +59,6 @@ public abstract class Entity {
 		else {
 			this.key = new Key(getType(), raw.getObjectId("_id").toHexString());
 		}
-		
-		assert getType().equals(key.getType());
 	}
 	
 	/**
@@ -137,7 +135,7 @@ public abstract class Entity {
 	
 	/**
 	 * Convert raw objects into the appropriate storage format for mongodb.
-	 * Notably, key -> document
+	 * Notably, {@link Key} -> {@link Document}
 	 * This is its own method because in the cast of lists, it calls itself recursively.
 	 * @param obj
 	 * @return

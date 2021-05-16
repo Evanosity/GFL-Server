@@ -5,6 +5,7 @@ import org.bson.types.ObjectId;
 import com.mongodb.client.MongoClient;
 
 import io.vertx.core.Vertx;
+import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.NetServer;
 
@@ -38,9 +39,19 @@ public class MainVerticle extends GFLVerticle{
 			socket.handler(buffer -> {		
 				JsonObject incoming = buffer.toJsonObject();
 				
-				String actionName = incoming.getString("action");
+				System.out.println(incoming.getString("action"));
+				
+				JsonObject outgoing = new JsonObject();
+				outgoing.put("message", "Hey!");
+				
+				socket.write(Json.encodeToBuffer(outgoing));
+				
+				vertx.setTimer(5000, event -> {
+					socket.close();
+				});
+				
 							
-				Utils.instantiate("ca.grindforloot.server.actions." + actionName, socket, incoming);
+				//Utils.instantiate("ca.grindforloot.server.actions." + actionName, socket, incoming);
 			});
 		});
 		

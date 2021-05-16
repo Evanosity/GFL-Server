@@ -1,8 +1,8 @@
 package ca.grindforloot.server.db;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -18,9 +18,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 
-import ca.grindforloot.server.Utils;
 import ca.grindforloot.server.entities.*;
-import ca.grindforloot.server.entities.Character;
 
 /**
  * The main point of access for DB Access.
@@ -78,6 +76,15 @@ public class DBService {
 		
 		putInternal(ent, col);
 	}
+	
+	/**
+	 * Same as calling put(Iterable<Entity>)
+	 * @param entities
+	 */
+	public void put(Entity...entities ) {
+		put(Arrays.asList(entities));
+	}
+	
 	/**
 	 * Insert a list of entities into the database
 	 * @param ents
@@ -99,6 +106,14 @@ public class DBService {
 	 * @param col - the MongoCollection we're putting this document to
 	 */
 	private void putInternal(Entity ent, MongoCollection<Document> col) {
+		
+		//TODO consider a put event handler
+		
+		if(ent.projected()) {
+			//somehow log that we can't save projected entities.
+			return;
+		}
+		
 		if(ent.isNew())
 			col.insertOne(ent.raw);
 		else
@@ -108,19 +123,43 @@ public class DBService {
 	public void deleteEntity(Entity ent) {		
 		delete(ent.getKey());
 	}
-	public void delete(Key key) {
-		MongoCollection<Document> col = db.getCollection(key.getType());
-		
-		deleteInternal(key, col);
+	
+	/**
+	 * Delete entities from the DB. This is the same as deleteEntity(Iterable)
+	 * @param entities
+	 */
+	public void deleteEntity(Entity...entities) {
+		deleteEntity(Arrays.asList(entities));
 	}
 	
+	/**
+	 * Delete entities from the DB.
+	 * @param entities
+	 */
 	public void deleteEntity(Iterable<Entity> entities) {
 		List<Key> keys = getKeysFromEntities(entities);
 		
 		delete(keys);
 	}
+	
 	/**
-	 * Delete a set of entities by their key.
+	 * Delete an entity from the DB based on its key
+	 * @param key
+	 */
+	public void delete(Key key) {
+		MongoCollection<Document> col = db.getCollection(key.getType());
+		
+		deleteInternal(key, col);
+	}
+	/**
+	 * Delete a collection of entities by their key. This is the same as delete(Iterable)
+	 * @param keys
+	 */
+	public void delete(Key...keys) {
+		delete(Arrays.asList(keys));
+	}
+	/**
+	 * Delete a collection of entities by their key.
 	 * @param keys
 	 */
 	public void delete(Iterable<Key> keys) {
@@ -146,6 +185,8 @@ public class DBService {
 	
 	/**
 	 * Fetch a list of entities from a list of keys.
+	 * 
+	 * All of these entities will not *necessarily* be the same type. You will need to cast to the appropriate type.
 	 * @param keys
 	 * @return
 	 */
@@ -166,7 +207,7 @@ public class DBService {
 			MongoCollection<Document> col = db.getCollection(type);
 			
 			for(Document doc : col.find(filter)) 
-				result.add(entityService.createEntityObject(new Key(type, doc.getObjectId("_id")), doc));
+				result.add(entityService.buildEntity(new Key(type, doc.getObjectId("_id")), doc));
 		}
 		
 		return result;
@@ -184,7 +225,7 @@ public class DBService {
 		if(docs.size() != 1)
 			throw new IllegalStateException("cant have multiple docs with the same identifier. delete this project.");
 		
-		return entityService.createEntityObject(key, docs.get(0));	
+		return entityService.buildEntity(key, docs.get(0));	
 	}
 	
 	/**
@@ -193,7 +234,7 @@ public class DBService {
 	 * @param filter
 	 * @return
 	 */
-	protected List<Entity> fetchInternal(String type, Bson filter){
+	protected <T extends Entity> List<T> fetchInternal(String type, Bson filter){
 		return fetchInternal(type, filter, null);
 	}
 	
@@ -205,17 +246,17 @@ public class DBService {
 	 * @param projections - a set of the fields we're projection. This can be null.
 	 * @return
 	 */
-	protected List<Entity> fetchInternal(String type, Bson filter, Set<String> projections){
+	protected <T extends Entity> List<T> fetchInternal(String type, Bson filter, Set<String> projections){
 		
 		Bson composedProj = QueryService.generateProjections(projections);
 		
 		List<Document> rawList = fetchRawInternal(type, filter, composedProj);
-		List<Entity> result = new ArrayList<>();
+		List<T> result = new ArrayList<>();
 		
 		for(Document doc : rawList) {
 			Key key = new Key(type, doc.getObjectId("_id"));
 						
-			result.add(entityService.createEntityObject(key, doc));
+			result.add(entityService.buildEntity(key, doc));
 		}
 		
 		return result;
@@ -240,7 +281,7 @@ public class DBService {
 	}
 	
 	
-	//Below this point are helper methods for sorting entities and extracting information from a collection of entities
+	//Below this point are helper methods for sorting entities and extracting information from a collection of entities/keys
 	
 	/**
 	 * Extracts a list of keys from a list of entities
@@ -271,7 +312,7 @@ public class DBService {
 	}
 	
 	/**
-	 * Sorts a list of entities into a map of entity type-entity
+	 * Sorts a list of entities into a map of type-list<entity>
 	 * @param ents
 	 * @return
 	 */
@@ -291,6 +332,12 @@ public class DBService {
 		
 		return result;
 	}
+	
+	/**
+	 * Sorts a list of keys into a map of type-list<key>
+	 * @param keys
+	 * @return
+	 */
 	private Map<String, List<Key>> sortKeysByType(Iterable<Key> keys){
 		Map<String, List<Key>> result = new HashMap<>();
 		

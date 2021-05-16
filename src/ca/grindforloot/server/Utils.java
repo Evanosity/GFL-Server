@@ -65,7 +65,7 @@ public class Utils {
 			
 		} catch (Exception e) {
 			//TODO log it.
-			throw new RuntimeException("Error while instantiating " + path + " Stacktrace: " + e.getStackTrace());
+			throw new RuntimeException("Error while instantiating " + path + "Name: " + e.getMessage() + " Stacktrace: " + e.getStackTrace());
 		}
 	}
 }

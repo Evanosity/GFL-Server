@@ -9,7 +9,10 @@ import ca.grindforloot.server.db.Entity;
 import ca.grindforloot.server.db.Key;
 
 /**
- * This might be necessary?? So we can avoid public constructors on entities
+ * This is an extension on DBService that is used for generating entity objects.
+ * It is in its own class so that it can be in the package with the rest of the entity types. All of their constructors are protected,
+ * and this class is the only place you can create entity objects.
+ * 
  * @author Evan
  *
  */
@@ -33,23 +36,39 @@ public class EntityService {
 		return createEntityObject(key, new Document(), true, null);
 	}
 	
-	public <T extends Entity> T createEntityObject(Key key, Document doc) {
+	public <T extends Entity> T buildEntity(Key key, Document doc) {
 		return createEntityObject(key, doc, false, null);
 	}
 	
-	public <T extends Entity> T createEntityObject(Key key, Document doc, Set<String> projections) {
+	public <T extends Entity> T buildEntity(Key key, Document doc, Set<String> projections) {
 		return createEntityObject(key, doc, false, projections);
 	}
 	
 	@SuppressWarnings("unchecked")
 	private <T extends Entity> T createEntityObject(Key key, Document doc, Boolean isNew, Set<String> projections) {
+		T result = null;
 		switch(key.getType()) {
 			case "Character":
-				return (T) new Character(db, doc, isNew, projections);
+				result = (T) new Character(db, doc, isNew, projections);
+				break;
 			case "User":
-				return (T) new User(db, doc, isNew, projections);
-		default:
-			throw new IllegalArgumentException("Entity type" + key.getType() + " is not supported.");
+				result = (T) new User(db, doc, isNew, projections);
+				break;
+			case "Item":
+				result = (T) new Item(db, doc, isNew, projections);
+				break;
+			case "State":
+				result = (T) new State(db, doc, isNew, projections);
+				break;
+			case "Connection":
+				result = (T) new Connection(db, doc, isNew, projections);
+				break;
+			default:
+				throw new IllegalArgumentException("Entity type" + key.getType() + " is not supported.");
 		}
+		
+		assert key.getType() == result.getType();
+		
+		return result;
 	}
 }

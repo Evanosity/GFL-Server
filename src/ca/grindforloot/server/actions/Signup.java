@@ -1,13 +1,12 @@
 package ca.grindforloot.server.actions;
 
 import ca.grindforloot.server.Context;
-import ca.grindforloot.server.db.Entity;
 import ca.grindforloot.server.db.QueryService;
 import ca.grindforloot.server.db.QueryService.FilterOperator;
+import ca.grindforloot.server.entities.EntityService;
+import ca.grindforloot.server.entities.Character;
 import ca.grindforloot.server.entities.User;
 import ca.grindforloot.server.errors.UserError;
-import io.vertx.core.json.JsonObject;
-import io.vertx.core.net.NetSocket;
 
 public class Signup extends Action{
 	
@@ -19,13 +18,12 @@ public class Signup extends Action{
 	public void perform() throws UserError {
 		
 		QueryService qs = new QueryService(db);
+		EntityService es = new EntityService(db);
 		
 		String email = context.getStringProperty("username");
 		String hashedPassword = context.getStringProperty("pass");
 		String characterName = context.getStringProperty("characterName");
-		
-		boolean x = false;
-		
+				
 		if(qs.countEntities("User", "email", FilterOperator.EQUAL, email) > 0)
 			throw new UserError("Email already created.");
 		
@@ -34,13 +32,13 @@ public class Signup extends Action{
 		
 		//TODO enforce a regex on the character name and potentially the email as well?
 		
-		User user = (User) db.createEntity("User");
+		User user = es.createEntity("User");
 		user.setEmail(email);
 		user.setPassword(hashedPassword);
 		
-		Character character = (Character) db.createEntity("Character");
+		Character character = es.createEntity("Character");
 		
-		db.put(user);
+		db.put(user, character);
 		
 	}
 
