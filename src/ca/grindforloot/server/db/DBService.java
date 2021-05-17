@@ -17,9 +17,11 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.TransactionBody;
 import com.mongodb.client.model.Filters;
+
+import ca.grindforloot.server.entities.EntityService;
+
 import com.mongodb.client.ClientSession;
 
-import ca.grindforloot.server.entities.*;
 
 /**
  * The main point of access for DB Access.
@@ -67,7 +69,6 @@ public class DBService {
 				resolved = true;
 		}
 		
-		
 		return new Key(type, random.toHexString());
 	}
 	
@@ -80,7 +81,6 @@ public class DBService {
 		session = client.startSession();
 		
 		TransactionBody<Boolean> txn = new TransactionBody<Boolean>() {
-
 			@Override
 			public Boolean execute() {
 				try {
@@ -314,6 +314,27 @@ public class DBService {
 			result.add(doc);
 		
 		return result;
+	}
+	
+	/**
+	 * Convert raw objects into the appropriate storage format for mongodb.
+	 * Notably, {@link Key} -> {@link Document}
+	 * This is its own method because in the case of lists, it calls itself recursively.
+	 * @param obj
+	 * @return
+	 */
+	public static Object parseValue(Object obj) {
+		if(obj instanceof Key) {
+			Key key = (Key) obj;
+			return key.toDocument();
+		}
+		if(obj instanceof List) {			
+			for(Object o : (List<?>) obj) 
+				return parseValue(o);
+			
+		}
+		
+		return obj;
 	}
 	
 	

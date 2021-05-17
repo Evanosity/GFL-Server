@@ -15,15 +15,36 @@ public class User extends Entity{
 		super(db, doc, isNew, projections);
 	}
 	
+	/**
+	 * Get the users email
+	 * @return
+	 */
 	public String getEmail() {
 		return raw.getString("email");
 	}
+	
+	/**
+	 * Set the users email
+	 * @param email
+	 */
 	public void setEmail(String email) {
 		raw.put("email", email);
 	}
+	
+	/**
+	 * Returns true if the given string is equal to the hashed password.
+	 * @param hash
+	 * @return
+	 */
 	public boolean validatePassword(String hash) {
 		return hash.equals(raw.getString("password"));
 	}
+	
+	/**
+	 * Replace the hashed password
+	 * @param hash
+	 * @return
+	 */
 	public boolean setPassword(String hash) {
 		String oldPass = raw.getString("password");
 		

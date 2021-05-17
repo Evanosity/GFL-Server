@@ -1,6 +1,5 @@
 package ca.grindforloot.server.db;
 
-import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 
@@ -40,8 +39,6 @@ public abstract class Entity {
 	//entity with projections. Here, it's implied that the entity is NOT new.
 	protected Entity(DBService db, Document raw, Set<String> projections) {
 		this(db, raw, false, projections);
-		
-		JsonObject test = new JsonObject(new String());
 	}
 	
 	//internal constructor
@@ -90,7 +87,7 @@ public abstract class Entity {
 	}
 	
 	protected void setValue(String key, Object value) {
-		raw.put(key, parseValue(value));
+		raw.put(key, DBService.parseValue(value));
 	}
 	
 	/**
@@ -140,26 +137,5 @@ public abstract class Entity {
 			result.put(entry.getKey(), entry.getValue());
 		
 		return result;
-	}
-	
-	/**
-	 * Convert raw objects into the appropriate storage format for mongodb.
-	 * Notably, {@link Key} -> {@link Document}
-	 * This is its own method because in the case of lists, it calls itself recursively.
-	 * @param obj
-	 * @return
-	 */
-	private static Object parseValue(Object obj) {
-		if(obj instanceof Key) {
-			Key key = (Key) obj;
-			return key.toDocument();
-		}
-		if(obj instanceof List) {			
-			for(Object o : (List<?>) obj) 
-				return parseValue(o);
-			
-		}
-		
-		return obj;
 	}
 }

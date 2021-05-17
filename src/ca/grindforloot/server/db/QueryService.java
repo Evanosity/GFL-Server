@@ -88,8 +88,13 @@ public class QueryService {
 	protected static Bson generateUpdates(Map<String, Object> updates) {
 		List<Bson> bsonUpdates = new ArrayList<>();
 		
-		for(Entry<String, Object> entry : updates.entrySet()) 
-			bsonUpdates.add(Updates.set(entry.getKey(), entry.getValue()));
+		for(Entry<String, Object> entry : updates.entrySet()) {
+			
+			//ensure that we parse keys into documents
+			Object value = DBService.parseValue(entry.getValue());
+			
+			bsonUpdates.add(Updates.set(entry.getKey(), value));
+		}
 		
 		
 		return Updates.combine(bsonUpdates);
@@ -122,7 +127,10 @@ public class QueryService {
 			String type = entry.getKey();
 			Pair<FilterOperator, Object> rawFilter = entry.getValue();
 			
-			builtFilters.add(generateFilter(type, rawFilter.getKey(), rawFilter.getValue()));
+			//Ensure that we parse keys into documents
+			Object value = DBService.parseValue(rawFilter.getValue());
+			
+			builtFilters.add(generateFilter(type, rawFilter.getKey(), value));
 		}
 				
 		//Compose the final filter.

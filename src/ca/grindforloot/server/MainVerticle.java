@@ -12,6 +12,7 @@ import ca.grindforloot.server.db.DBService;
 import ca.grindforloot.server.db.Key;
 import ca.grindforloot.server.entities.EntityService;
 import ca.grindforloot.server.entities.Session;
+
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.AbstractVerticle;
@@ -23,12 +24,14 @@ import io.vertx.core.net.NetServer;
 
 public class MainVerticle extends AbstractVerticle{
 	
+	protected static MongoClient client = null;
+	
 	public static void main(String[]args) {
 		
 		Vertx vertx = Vertx.vertx();
 		
-		//MongoClient client = MongoClients.create("");
-		MongoClient client = null;
+		//client = MongoClients.create("");
+
 				
 		DnsClient dns = vertx.createDnsClient(53, "9.9.9.9");
 		
@@ -56,34 +59,29 @@ public class MainVerticle extends AbstractVerticle{
 			
 			//THIS IS THE SCOPE OF EACH SESSION!
 			
-			JsonObject result = new JsonObject();
-			result.put("clicked", "no");
+			DBService db = new DBService(client);
 			
-			DBService db = new DBService(null);
+			Session newSession = new EntityService(db).createEntity("Session");			
+			db.put(newSession);
 			
-			Session session = new EntityService(db).createEntity("Session");			
-			db.put(session);
-			
-			Key sessionKey = session.getKey();
+			Key sessionKey = newSession.getKey();
 			
 			socket.handler(buffer -> {		
 				//This is the scope of each individual request.
-				
 				JsonObject incoming = buffer.toJsonObject();
 				
-				Context context = new Context(vertx, socket, db, incoming);
+				Session session = db.getEntity(sessionKey);
 				
-				db.doTransaction(() -> {
-					db.delete(sessionKey);
-				});
+				//Compose the context object. This gets passed to every action and service.
+				Context context = new Context(vertx, socket, db, incoming, session);
+				
+
 
 				
 				System.out.println(incoming.getString("action"));
 				
 				JsonObject outgoing = new JsonObject();
 				outgoing.put("message", "Hey!");
-				
-				result.put("clicked", "yes");
 				
 				socket.write(Json.encodeToBuffer(outgoing));		
 			});
@@ -107,17 +105,21 @@ public class MainVerticle extends AbstractVerticle{
 				
 			}));
 			
-			socket.closeHandler(handler -> {
-				System.out.println(result.getString("clicked"));
-				
+			/**
+			 * Whenever a user disconnects, this handlers get called.
+			 * We unregister all of their handlers, so the event bus doesn't bloat.
+			 * We also delete their session.
+			 */
+			socket.closeHandler(handler -> {				
 				for(MessageConsumer<Object> mc : consumers)
 					unregisterConsumer(mc);
 				
-				db.delete(sessionKey);
+				db.doTransaction(() -> {
+					db.delete(sessionKey);
+				});
+				
+				//
 			});
-			
-			
-			
 		});
 		
 		//TODO cron jobs?

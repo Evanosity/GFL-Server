@@ -48,27 +48,30 @@ public class EntityService {
 	private <T extends Entity> T createEntityObject(Key key, Document doc, Boolean isNew, Set<String> projections) {
 		T result = null;
 		switch(key.getType()) {
-			case "Character":
-				result = (T) new Being(db, doc, isNew, projections);
-				break;
-			case "User":
-				result = (T) new User(db, doc, isNew, projections);
-				break;
-			case "Item":
-				result = (T) new Item(db, doc, isNew, projections);
-				break;
-			case "State":
-				result = (T) new State(db, doc, isNew, projections);
-				break;
-			case "Connection":
-				result = (T) new Connection(db, doc, isNew, projections);
-				break;
-			default:
-				throw new IllegalArgumentException("Entity type" + key.getType() + " is not supported.");
+		case "User":
+			result = (T) new User(db, doc, isNew, projections);
+			break;
+		case "Session":
+			result = (T) new Session(db, doc, isNew, projections);
+			break;
+		case "Character":
+			result = (T) new Being(db, doc, isNew, projections);
+			break;
+		case "Item":
+			result = (T) new Item(db, doc, isNew, projections);
+			break;
+		case "State":
+			result = (T) new State(db, doc, isNew, projections);
+			break;
+		case "Connection":
+			result = (T) new Connection(db, doc, isNew, projections);
+			break;
+		default:
+			throw new IllegalArgumentException("Entity type" + key.getType() + " is not supported.");
 		}
-		
+
 		assert key.getType() == result.getType();
-		
+
 		return result;
 	}
 }
