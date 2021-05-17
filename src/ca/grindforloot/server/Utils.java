@@ -33,15 +33,15 @@ public class Utils {
 		return false;
 	}
 	
+	private static Map<String, Constructor<?>> constructorCache = new ConcurrentHashMap<>();
 	/**
 	 * Given a path and parameters, reflectively instantiate an object.
 	 * This will throw a RuntimeException if the incorrect parameter types are passed in.
-	 * TODO IMPORTANT! Deprecate this with switch statements. But for now.... it works....
 	 * @param path
 	 * @param params
 	 * @return
 	 */
-	private static Map<String, Constructor<?>> constructorCache = new ConcurrentHashMap<>();	
+	@Deprecated
 	public static Object instantiate(String path, Object... params) {
 		
 		try {

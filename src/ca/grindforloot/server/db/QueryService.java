@@ -34,7 +34,7 @@ public class QueryService {
 		this.db = db;
 	}
 	
-	public <T extends Entity> List<T> fetchEntites(String type, String field, FilterOperator op, Object value){
+	public <T extends Entity> List<T> fetchEntities(String type, String field, FilterOperator op, Object value){
 		Query q = new Query(type);
 		q.addFilter(field, op, value);
 		

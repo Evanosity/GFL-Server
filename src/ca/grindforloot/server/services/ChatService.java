@@ -1,7 +1,6 @@
 package ca.grindforloot.server.services;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import ca.grindforloot.server.GameContext;
@@ -31,6 +30,7 @@ public class ChatService extends Service{
 	
 	/**
 	 * Generate an Address-Handler map of all the consumers for this character.
+	 * This should really be in a different service.
 	 * @return
 	 */
 	public Map<String, Handler<Message<Object>>> generateStateHandlers(NetSocket output){
@@ -74,7 +74,21 @@ public class ChatService extends Service{
 		return result;
 	}
 	
-	public Handler<Message<Object>> generateChatHandler(String channel, NetSocket output){
+	public String formatChatMessage(String message) {
+		String newMessage = message;
+		
+		//apply a regex to the message
+		
+		return newMessage;
+	}
+	
+	/**
+	 * 
+	 * @param channel
+	 * @param output
+	 * @return
+	 */
+	public Handler<Message<Object>> generateChatHandler(NetSocket output){
 		return new Handler<Message<Object>>() {
 			@Override
 			public void handle(Message<Object> event) {
@@ -84,7 +98,6 @@ public class ChatService extends Service{
 				outgoing.put("type", "chat");
 				outgoing.put("message", message.getString("message"));
 				outgoing.put("sender", message.getString("sender"));
-				outgoing.put("channel", message.getString("channel"));
 				
 				//We then need to evaluate if this message should actually be retrieved. CRIPES this is gonna be inefficient.
 				output.write(Json.encodeToBuffer(outgoing));

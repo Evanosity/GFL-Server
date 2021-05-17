@@ -12,6 +12,7 @@ import com.mongodb.client.MongoClient;
 import ca.grindforloot.server.actions.Action;
 import ca.grindforloot.server.actions.Login;
 import ca.grindforloot.server.actions.Signup;
+import ca.grindforloot.server.controllers.Controller;
 import ca.grindforloot.server.db.DBService;
 import ca.grindforloot.server.db.Key;
 import ca.grindforloot.server.entities.EntityService;
@@ -45,21 +46,27 @@ public class MainVerticle extends AbstractVerticle{
 		eb.registerDefaultCodec(JsonObject.class, null);
 		
 		vertx.deployVerticle(new MainVerticle(), id -> {
-			
+			//do nothing with it
 		});
 		
 		System.out.println(new ObjectId());
 		
 	}
 	
+	/**
+	 * spin up the TCP server, and set its handlers accordingly.
+	 */
 	public void start() {	
 		NetServer server = vertx.createNetServer();
 		//connection is made to a client
 		server.connectHandler(socket -> {
 			
+			//THIS IS THE SCOPE OF EACH SESSION!
+			
+			//This is all the EventBus consumers for this user. These gets cleaned up when the socket disconnects.
+			//Chat, update, etc
 			List<MessageConsumer<Object>> consumers = new ArrayList<>();
 			
-			//THIS IS THE SCOPE OF EACH SESSION!
 			
 			//the GC will collect this object, and we will generate a new one in the scope of each request.
 			DBService dbTemp = new DBService(client);
@@ -71,14 +78,16 @@ public class MainVerticle extends AbstractVerticle{
 			
 			socket.handler(buffer -> {		
 				//This is the scope of each individual request.
+				
 				JsonObject incoming = buffer.toJsonObject();
+				String id = incoming.getString("identifier");
 				
 				DBService db = new DBService(client);
 				
 				Session session = db.getEntity(sessionKey);
 				
 				//Compose the context object. This gets passed to every action and service.
-				GameContext ctx = new GameContext(vertx, socket, db, incoming, session);
+				GameContext ctx = new GameContext(vertx, socket, db, incoming, session, id);
 				
 				//we process the user's request
 				try {
@@ -101,7 +110,7 @@ public class MainVerticle extends AbstractVerticle{
 						});
 						
 						//generate the new consumers.
-						consumers.addAll(registerStateHandlers(cs, socket));
+						consumers.addAll(ctx.replaceStateHandlers());
 						
 						break;
 						
@@ -111,6 +120,26 @@ public class MainVerticle extends AbstractVerticle{
 						String message = ctx.getStringProperty("message");
 						
 						cs.sendMessage(channel, message);
+						
+						break;
+						
+					//the user is loading a view of something, and we need to generate the necessary information.
+					//"Controllers". These need to be built in conjunction with JavaFX nodes.
+					case "view":
+						
+						String viewName = ctx.getStringProperty("view");
+						
+						Controller controller = generateController(viewName, ctx);
+						
+						JsonObject result = controller.process();
+						
+						JsonObject outgoing = new JsonObject();
+						
+						outgoing.put("type", "view");
+						outgoing.put("name", viewName);
+						outgoing.put("data", result);
+						
+						ctx.writeToSocket(outgoing);
 						
 						break;
 					default:
@@ -139,11 +168,11 @@ public class MainVerticle extends AbstractVerticle{
 				
 				socket.write(Json.encodeToBuffer(outgoing));		
 			});
-			
+						
 			/**
 			 * Whenever a user disconnects, this handler get called.
 			 * We unregister all of their handlers, so the event bus doesn't bloat.
-			 * We also delete their session.
+			 * We also delete their session. TODO do we reallllly need to do that?
 			 */
 			socket.closeHandler(handler -> {				
 				for(MessageConsumer<Object> mc : consumers)
@@ -169,49 +198,38 @@ public class MainVerticle extends AbstractVerticle{
 	}
 	
 	/**
-	 * Generates and then registers the appropriate EventBus handlers given the user's game state.
-	 * For example; every time the user moves to a new "State", their location chat will swap.
-	 * @param cs
-	 * @param socket
-	 * @return
-	 */
-	public List<MessageConsumer<Object>> registerStateHandlers(ChatService cs, NetSocket socket) {
-		
-		//If the user IS NOT authenticated, we register no handlers.
-		if(cs.ctx.session.isAuthenticated() == false) {
-			return new ArrayList<>();
-		}
-		
-		List<MessageConsumer<Object>> result = new ArrayList<>();
-		
-		//Generate all the state-based handlers for this session.
-		Map<String, Handler<Message<Object>>> handlers = cs.generateStateHandlers(socket);
-		
-		for(Entry<String, Handler<Message<Object>>> entry : handlers.entrySet()) {
-			String address = entry.getKey();
-			//register the new handlers.
-			result.add(vertx.eventBus().consumer(address, entry.getValue()));
-		}
-		
-		return result;
-	}
-	
-	/**
 	 * Generate an action.
-	 * @param <A>
+	 * @param <T>
 	 * @param actionName
 	 * @param ctx
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
-	public <A extends Action> A generateAction(String actionName, GameContext ctx) {
+	public <T extends Action> T generateAction(String actionName, GameContext ctx) {
 		switch(actionName) {
 		case "login":
-			return (A) new Login(ctx);
+			return (T) new Login(ctx);
 		case "signup":
-			return (A) new Signup(ctx);
+			return (T) new Signup(ctx);
 		default:
 			throw new IllegalArgumentException("Action " + actionName + " not supported by generateAction()");
+		}
+	}
+	
+	/**
+	 * Generate a controller
+	 * @param <T>
+	 * @param controllerName
+	 * @param ctx
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends Controller> T generateController(String controllerName, GameContext ctx) {
+		switch(controllerName) {
+		case "item":
+			return (T) new Controller(ctx);
+		default:
+			throw new IllegalArgumentException("Controller " + controllerName + " not supported by generateController()");
 		}
 	}
 		
