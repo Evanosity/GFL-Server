@@ -81,7 +81,11 @@ public abstract class Entity {
 	public Set<String> getProjections(){
 		return projections;
 	}
-		
+	
+	public String getName() {
+		return raw.getString("name");
+	}
+	
 	protected Object getValue(String key) {
 		return raw.get(key);
 	}

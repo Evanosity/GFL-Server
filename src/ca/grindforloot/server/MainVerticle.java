@@ -15,7 +15,7 @@ import ca.grindforloot.server.db.Key;
 import ca.grindforloot.server.entities.EntityService;
 import ca.grindforloot.server.entities.Session;
 import ca.grindforloot.server.errors.UserError;
-
+import ca.grindforloot.server.services.ChatService;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.AbstractVerticle;
@@ -72,7 +72,6 @@ public class MainVerticle extends AbstractVerticle{
 				
 				//we process the user's request
 				try {
-					
 					//The "type" of the request describes, vaguely, what the client is trying to do.
 					switch(ctx.getStringProperty("type")) {
 					//in the case of an action, execute server-side logic.
@@ -90,10 +89,12 @@ public class MainVerticle extends AbstractVerticle{
 						String channel = ctx.getStringProperty("channel");
 						String message = ctx.getStringProperty("message");
 						
-						vertx.eventBus().publish("chat.out." + channel, message);
+						ChatService cs = new ChatService(ctx);
+						cs.sendMessage(channel, message);
 						
 						break;
 					default:
+						throw new UserError("Internal Error", "Request type " + ctx.getStringProperty("type") + " is unsupported.");
 					}
 				}
 				//UserError gets caught and then displayed back to the user.
@@ -126,9 +127,27 @@ public class MainVerticle extends AbstractVerticle{
 			
 			List<MessageConsumer<Object>> consumers = new ArrayList<>();
 			
+			/**
+			 * I need to think about this. Many of the chat channels will be state dependant.
+			 * I'm thinking that we will give each socket a "chat.out" consumer, and then validate the message in that handler.
+			 * 
+			 * A formatted message has been received. Pipe it to the client.
+			 */
 			consumers.add(vertx.eventBus().consumer("chat.out", handler -> {
-				//chat message
+				JsonObject message = (JsonObject) handler.body(); //TODO codec
+				
+				JsonObject outgoing = new JsonObject();
+				outgoing.put("type", "chat");
+				outgoing.put("message", message.getString("message"));
+				outgoing.put("sender", message.getString("sender"));
+				outgoing.put("channel", message.getString("channel"));
+				
+				//We then need to evaluate if this message should actually be retrieved. CRIPES this is gonna be inefficient.
+				
+				socket.write(Json.encodeToBuffer(outgoing));
+				
 			}));
+
 			
 			//Client update
 			consumers.add(vertx.eventBus().consumer("update." + newSession.getId(), handler -> {

@@ -7,13 +7,13 @@ import io.vertx.core.net.NetSocket;
 
 public class Service {
 	
-	public final Context context;
+	public final Context ctx;
 	public final DBService db;
 	public final NetSocket socket;
 	public final Vertx vertx;
 	
 	public Service(Context context) {
-		this.context = context;
+		this.ctx = context;
 		db = context.getDB();
 		socket = context.socket;
 		vertx = context.vertx;

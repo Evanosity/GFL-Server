@@ -11,6 +11,8 @@ import ca.grindforloot.server.db.Key;
 
 public class User extends Entity{
 	
+	private Being currentBeing = null;
+	
 	protected User(DBService db, Document doc, boolean isNew, Set<String> projections) {
 		super(db, doc, isNew, projections);
 	}
@@ -52,6 +54,18 @@ public class User extends Entity{
 		
 		return oldPass.equals(hash);
 	}
+	
+	public Being getActiveBeing() {
+		if(currentBeing == null) {
+			Key key = getKeyValue("beingKey");
+			
+			//wow, i love this api
+			currentBeing = db.getEntity(key);
+		}
+		
+		return currentBeing;
+	}
+	
 	public List<Key> getCharacterKeys(){
 		return null;
 	}

@@ -4,7 +4,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 import ca.grindforloot.server.db.DBService;
+import ca.grindforloot.server.entities.Being;
 import ca.grindforloot.server.entities.Session;
+import ca.grindforloot.server.entities.User;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
@@ -50,6 +52,14 @@ public class Context {
 		this.vertx = vertx;
 		
 		this.session = session;
+	}
+	
+	public User getUser() {
+		return session.getUser();
+	}
+	
+	public Being getActiveBeing() {
+		return getUser().getActiveBeing();
 	}
 	
 	public DBService getDB() {

@@ -10,6 +10,8 @@ import ca.grindforloot.server.db.Key;
 
 public class Session extends Entity{
 	
+	private User user = null;
+	
 	protected Session(DBService db, Document raw, boolean isNew, Set<String> projections) {
 		super(db, raw, isNew, projections);
 		// TODO Auto-generated constructor stub
@@ -33,10 +35,14 @@ public class Session extends Entity{
 	
 	public User getUser() {
 		if(isAuthenticated()) {
-			Key key = getKeyValue("userKey");
+			if(user == null) {
+				Key key = getKeyValue("userKey");
+				
+				//wow, i love this api
+				user = db.getEntity(key);
+			}
 			
-			//wow, i love this api
-			return db.getEntity(key);
+			return user;
 		}
 		else 
 			return null;
