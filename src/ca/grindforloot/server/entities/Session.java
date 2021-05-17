@@ -24,6 +24,13 @@ public class Session extends Entity{
 		setValue("userKey", user.getKey());
 	}
 	
+	public void logout() {
+		if(isAuthenticated()) {
+			setValue("authenticated", false);
+			setValue("userKey", null);
+		}
+	}
+	
 	public User getUser() {
 		if(isAuthenticated()) {
 			Key key = getKeyValue("userKey");

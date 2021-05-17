@@ -6,18 +6,20 @@ import java.util.List;
 import org.bson.types.ObjectId;
 
 import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
 
+import ca.grindforloot.server.actions.Action;
+import ca.grindforloot.server.actions.Login;
+import ca.grindforloot.server.actions.Signup;
 import ca.grindforloot.server.db.DBService;
 import ca.grindforloot.server.db.Key;
 import ca.grindforloot.server.entities.EntityService;
 import ca.grindforloot.server.entities.Session;
+import ca.grindforloot.server.errors.UserError;
 
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Vertx;
-import io.vertx.core.dns.DnsClient;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.NetServer;
@@ -31,22 +33,15 @@ public class MainVerticle extends AbstractVerticle{
 		Vertx vertx = Vertx.vertx();
 		
 		//client = MongoClients.create("");
-
-				
-		DnsClient dns = vertx.createDnsClient(53, "9.9.9.9");
-		
-		dns.reverseLookup("9.9.9.9", ar -> {
-			if(ar.succeeded()) {
-				System.out.println(ar.result());
-			}
-		});
 		
 		EventBus eb = vertx.eventBus();
 		
-		//TODO
+		//TODO figure out codecs
 		eb.registerDefaultCodec(JsonObject.class, null);
 		
-		//vertx.deployVerticle(new MainVerticle());
+		vertx.deployVerticle(new MainVerticle(), id -> {
+			
+		});
 		
 		System.out.println(new ObjectId());
 		
@@ -54,7 +49,7 @@ public class MainVerticle extends AbstractVerticle{
 	
 	public void start() {	
 		NetServer server = vertx.createNetServer();
-		//connection comes in
+		//connection is made to a client
 		server.connectHandler(socket -> {
 			
 			//THIS IS THE SCOPE OF EACH SESSION!
@@ -73,9 +68,47 @@ public class MainVerticle extends AbstractVerticle{
 				Session session = db.getEntity(sessionKey);
 				
 				//Compose the context object. This gets passed to every action and service.
-				Context context = new Context(vertx, socket, db, incoming, session);
+				Context ctx = new Context(vertx, socket, db, incoming, session);
 				
-
+				//we process the user's request
+				try {
+					
+					//The "type" of the request describes, vaguely, what the client is trying to do.
+					switch(ctx.getStringProperty("type")) {
+					//in the case of an action, execute server-side logic.
+					case "action":
+						Action action = generateAction(ctx.getStringProperty("action"), ctx);
+						
+						action.doChecks();
+						
+						action.perform();
+						
+						break;
+						
+					//The user is sending a chat message
+					case "chat":
+						String channel = ctx.getStringProperty("channel");
+						String message = ctx.getStringProperty("message");
+						
+						vertx.eventBus().publish("chat.out." + channel, message);
+						
+						break;
+					default:
+					}
+				}
+				//UserError gets caught and then displayed back to the user.
+				catch(UserError e) {
+					JsonObject error = new JsonObject();
+					
+					error.put("type", "error");
+					error.put("title", e.getErrorName());
+					error.put("message", e.getMessage());
+					
+					if(e.getCause() != null) 
+						error.put("cause", e.getCause().getStackTrace().toString()); //todo lol
+					
+					ctx.writeToSocket(error);
+				}
 
 				
 				System.out.println(incoming.getString("action"));
@@ -97,8 +130,8 @@ public class MainVerticle extends AbstractVerticle{
 				//chat message
 			}));
 			
-			//Game update
-			consumers.add(vertx.eventBus().consumer("update." + session.getId(), handler -> {
+			//Client update
+			consumers.add(vertx.eventBus().consumer("update." + newSession.getId(), handler -> {
 				JsonObject outgoing = (JsonObject) handler.body();
 				
 				socket.write(Json.encodeToBuffer(outgoing));
@@ -122,7 +155,7 @@ public class MainVerticle extends AbstractVerticle{
 			});
 		});
 		
-		//TODO cron jobs?
+		//TODO cron jobs? Decide if I'll make an XML file or do them all programatically.
 		
 		//TODO environment variables
 		server.listen(8080, "0.0.0.0", res -> {
@@ -131,6 +164,25 @@ public class MainVerticle extends AbstractVerticle{
 			else
 				System.out.println("Server failed to start");
 		});
+	}
+	
+	/**
+	 * Generate an action.
+	 * @param <A>
+	 * @param actionName
+	 * @param ctx
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public <A extends Action> A generateAction(String actionName, Context ctx) {
+		switch(actionName) {
+		case "login":
+			return (A) new Login(ctx);
+		case "signup":
+			return (A) new Signup(ctx);
+		default:
+			throw new IllegalArgumentException("Action " + actionName + " not supported by generateAction()");
+		}
 	}
 	
 	/**
@@ -144,7 +196,11 @@ public class MainVerticle extends AbstractVerticle{
 			if(result.succeeded())
 				return;
 			else
-				unregisterConsumer(mc);
+				//in the event of a looping failure, we dont want to bog down this thread.
+				//this is a textbook bandaid fix
+				vertx.setTimer(5000, handler -> {
+					unregisterConsumer(mc);
+				});
 		});
 		
 	}

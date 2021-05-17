@@ -4,7 +4,6 @@ import ca.grindforloot.server.Context;
 import ca.grindforloot.server.entities.Session;
 import ca.grindforloot.server.entities.User;
 import ca.grindforloot.server.errors.UserError;
-import io.vertx.core.json.JsonObject;
 
 public class Login extends Action{
 
@@ -14,8 +13,8 @@ public class Login extends Action{
 
 	@Override
 	public void perform() throws UserError {
-		String hashedPassword = context.getStringProperty("password");
-		Session session = context.session;
+		String hashedPassword = ctx.getStringProperty("password");
+		Session session = ctx.session;
 		
 		User user = session.getUser();
 		
@@ -25,13 +24,15 @@ public class Login extends Action{
 			db.put(session);
 			
 			//TODO update the client
+			//TODO preload old chat messages
 		}
-		else {
-			JsonObject result = new JsonObject();
-			result.put("type", "error");
-			result.put("message", "Invalid password");
-			
-			context.writeToSocket(result);
-		}
+		else
+			throw new UserError("Authentication Failed", "Invalid Password");
+	}
+
+	@Override
+	public void doChecks() throws UserError {
+		if(ctx.session.isAuthenticated())
+			throw new UserError("Login Failed", "You are already logged in.");
 	}
 }

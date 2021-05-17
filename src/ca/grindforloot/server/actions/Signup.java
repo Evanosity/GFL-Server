@@ -20,15 +20,16 @@ public class Signup extends Action{
 		QueryService qs = new QueryService(db);
 		EntityService es = new EntityService(db);
 		
-		String email = context.getStringProperty("username");
-		String hashedPassword = context.getStringProperty("pass");
-		String characterName = context.getStringProperty("characterName");
+		String email = ctx.getStringProperty("username");
+		String hashedPassword = ctx.getStringProperty("pass");
+		String characterName = ctx.getStringProperty("characterName");
 				
 		if(qs.countEntities("User", "email", FilterOperator.EQUAL, email) > 0)
-			throw new UserError("Email already created.");
+			throw new UserError("Authentication Failed", "Email already created.");
 		
 		if(qs.countEntities("Character", "name", FilterOperator.EQUAL, characterName) > 0)
-			throw new UserError("That character name is already in use.");
+			throw new UserError("Authentication Failed", "That character name is already in use.");
+
 		
 		//TODO enforce a regex on the character name and potentially the email as well?
 		
@@ -40,6 +41,12 @@ public class Signup extends Action{
 		
 		db.put(user, character);
 		
+	}
+
+	@Override
+	public void doChecks() throws UserError {
+		if(ctx.session.isAuthenticated())
+			throw new UserError("Signup Failed", "You are already signed in.");
 	}
 
 }

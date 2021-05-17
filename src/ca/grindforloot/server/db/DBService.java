@@ -24,8 +24,11 @@ import com.mongodb.client.ClientSession;
 
 
 /**
- * The main point of access for DB Access.
+ * The main point of access to MongoDB
  * My goal is to not expose the MongoDB api outside of this package.
+ * 
+ * See {@link QueryService} for querying and {@link EntityService} for the generation of entity objects.
+ * 
  * @author Evan
  *
  * TODO consider caching the collections we've called?
