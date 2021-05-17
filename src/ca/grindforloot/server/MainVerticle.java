@@ -40,6 +40,9 @@ public class MainVerticle extends AbstractVerticle{
 		
 		EventBus eb = vertx.eventBus();
 		
+		//TODO
+		eb.registerDefaultCodec(JsonObject.class, null);
+		
 		//vertx.deployVerticle(new MainVerticle());
 		
 		System.out.println(new ObjectId());
@@ -69,6 +72,10 @@ public class MainVerticle extends AbstractVerticle{
 				JsonObject incoming = buffer.toJsonObject();
 				
 				Context context = new Context(vertx, socket, db, incoming);
+				
+				db.doTransaction(() -> {
+					db.delete(sessionKey);
+				});
 
 				
 				System.out.println(incoming.getString("action"));
@@ -112,6 +119,8 @@ public class MainVerticle extends AbstractVerticle{
 			
 			
 		});
+		
+		//TODO cron jobs?
 		
 		//TODO environment variables
 		server.listen(8080, "0.0.0.0", res -> {

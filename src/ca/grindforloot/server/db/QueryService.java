@@ -56,19 +56,19 @@ public class QueryService {
 	public void runDeleteQuery(Query q) {
 		Bson filter = generateCompositeFilter(q.filters);
 		
-		db.db.getCollection(q.getType()).deleteMany(filter);
+		db.db.getCollection(q.getType()).deleteMany(db.session, filter);
 		
 	}
 	public void runUpdate(Query q) {
 		Bson filters = generateCompositeFilter(q.filters);
 		Bson updates = generateUpdates(q.updates);
 		
-		db.db.getCollection(q.getType()).updateMany(filters, updates);
+		db.db.getCollection(q.getType()).updateMany(db.session, filters, updates);
 	}
 	public Long runCount(Query q) {
 		Bson filters = generateCompositeFilter(q.filters);
 		
-		return db.db.getCollection(q.getType()).countDocuments(filters);
+		return db.db.getCollection(q.getType()).countDocuments(db.session, filters);
 	}
 	
 	/**

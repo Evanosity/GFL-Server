@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -16,7 +15,9 @@ import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.TransactionBody;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.ClientSession;
 
 import ca.grindforloot.server.entities.*;
 
@@ -29,12 +30,15 @@ import ca.grindforloot.server.entities.*;
  *
  */
 public class DBService {
-	//private final MongoClient client;
+	private final MongoClient client;
 	protected final MongoDatabase db;
 	private final EntityService entityService;
 	
+	//TODO test if we can pass this in as null.
+	protected ClientSession session = null;
+	
 	public DBService(MongoClient client) {
-		//this.client = client;
+		this.client = client;
 		//db = client.getDatabase("GFL");
 		db = null;
 		
@@ -65,6 +69,38 @@ public class DBService {
 		
 		
 		return new Key(type, random.toHexString());
+	}
+	
+	/**
+	 * Perform an action inside of a mongodb transaction.
+	 * @param action
+	 * @return
+	 */
+	public boolean doTransaction(Runnable action) {
+		session = client.startSession();
+		
+		TransactionBody<Boolean> txn = new TransactionBody<Boolean>() {
+
+			@Override
+			public Boolean execute() {
+				try {
+					action.run();
+				}
+				catch(Exception e) {
+					return false;
+				}
+				return true;
+			}
+		};
+		
+		try {
+			//TODO do we need TransactionOptions?
+			return session.withTransaction(txn);
+		}
+		finally {
+			session.close();
+			session = null;
+		}
 	}
 	
 	/**
@@ -115,9 +151,9 @@ public class DBService {
 		}
 		
 		if(ent.isNew())
-			col.insertOne(ent.raw);
+			col.insertOne(session, ent.raw);
 		else
-			col.replaceOne(QueryService.getFilterForId(ent.getId()), ent.raw);
+			col.replaceOne(session, QueryService.getFilterForId(ent.getId()), ent.raw);
 	}
 	
 	public void deleteEntity(Entity ent) {		
@@ -180,7 +216,7 @@ public class DBService {
 	 * @param col
 	 */
 	private void deleteInternal(Key key, MongoCollection<Document> col) {
-		col.deleteOne(QueryService.getFilterForId(key.getId()));
+		col.deleteOne(session, QueryService.getFilterForId(key.getId()));
 	}
 	
 	/**
@@ -206,7 +242,7 @@ public class DBService {
 			
 			MongoCollection<Document> col = db.getCollection(type);
 			
-			for(Document doc : col.find(filter)) 
+			for(Document doc : col.find(session, filter)) 
 				result.add(entityService.buildEntity(new Key(type, doc.getObjectId("_id")), doc));
 		}
 		
