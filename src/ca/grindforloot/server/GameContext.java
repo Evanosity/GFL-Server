@@ -20,7 +20,7 @@ import io.vertx.core.net.NetSocket;
  * @author Evan
  *
  */
-public class Context {
+public class GameContext {
 	private Map<String, Object> attributes;
 	public final NetSocket socket;
 	public final DBService db;
@@ -34,7 +34,7 @@ public class Context {
 	 * @param db
 	 * @param incoming
 	 */
-	public Context(Vertx vertx, NetSocket socket, DBService db, JsonObject incoming, Session session) {
+	public GameContext(Vertx vertx, NetSocket socket, DBService db, JsonObject incoming, Session session) {
 		if(socket == null)
 			throw new IllegalArgumentException("Socket cannot be null.");
 		this.socket = socket;

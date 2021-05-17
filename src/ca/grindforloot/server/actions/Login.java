@@ -1,13 +1,13 @@
 package ca.grindforloot.server.actions;
 
-import ca.grindforloot.server.Context;
+import ca.grindforloot.server.GameContext;
 import ca.grindforloot.server.entities.Session;
 import ca.grindforloot.server.entities.User;
 import ca.grindforloot.server.errors.UserError;
 
 public class Login extends Action{
 
-	public Login(Context context) {
+	public Login(GameContext context) {
 		super(context);
 	}
 

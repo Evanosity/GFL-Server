@@ -2,6 +2,8 @@ package ca.grindforloot.server;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import org.bson.types.ObjectId;
 
@@ -17,12 +19,15 @@ import ca.grindforloot.server.entities.Session;
 import ca.grindforloot.server.errors.UserError;
 import ca.grindforloot.server.services.ChatService;
 import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.eventbus.Message;
 import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.NetServer;
+import io.vertx.core.net.NetSocket;
 
 public class MainVerticle extends AbstractVerticle{
 	
@@ -52,12 +57,15 @@ public class MainVerticle extends AbstractVerticle{
 		//connection is made to a client
 		server.connectHandler(socket -> {
 			
+			List<MessageConsumer<Object>> consumers = new ArrayList<>();
+			
 			//THIS IS THE SCOPE OF EACH SESSION!
 			
-			DBService db = new DBService(client);
+			//the GC will collect this object, and we will generate a new one in the scope of each request.
+			DBService dbTemp = new DBService(client);
 			
-			Session newSession = new EntityService(db).createEntity("Session");			
-			db.put(newSession);
+			Session newSession = new EntityService(dbTemp).createEntity("Session");			
+			dbTemp.put(newSession);
 			
 			Key sessionKey = newSession.getKey();
 			
@@ -65,13 +73,17 @@ public class MainVerticle extends AbstractVerticle{
 				//This is the scope of each individual request.
 				JsonObject incoming = buffer.toJsonObject();
 				
+				DBService db = new DBService(client);
+				
 				Session session = db.getEntity(sessionKey);
 				
 				//Compose the context object. This gets passed to every action and service.
-				Context ctx = new Context(vertx, socket, db, incoming, session);
+				GameContext ctx = new GameContext(vertx, socket, db, incoming, session);
 				
 				//we process the user's request
 				try {
+					ChatService cs = new ChatService(ctx);
+					
 					//The "type" of the request describes, vaguely, what the client is trying to do.
 					switch(ctx.getStringProperty("type")) {
 					//in the case of an action, execute server-side logic.
@@ -82,6 +94,15 @@ public class MainVerticle extends AbstractVerticle{
 						
 						action.perform();
 						
+						//rid ourselves of the old consumers.
+						consumers.removeIf(consumer -> {
+							unregisterConsumer(consumer);
+							return consumer != null;
+						});
+						
+						//generate the new consumers.
+						consumers.addAll(registerStateHandlers(cs, socket));
+						
 						break;
 						
 					//The user is sending a chat message
@@ -89,7 +110,6 @@ public class MainVerticle extends AbstractVerticle{
 						String channel = ctx.getStringProperty("channel");
 						String message = ctx.getStringProperty("message");
 						
-						ChatService cs = new ChatService(ctx);
 						cs.sendMessage(channel, message);
 						
 						break;
@@ -120,45 +140,8 @@ public class MainVerticle extends AbstractVerticle{
 				socket.write(Json.encodeToBuffer(outgoing));		
 			});
 			
-			//register their client for all the listeners necessary for each client
-			//Anything that every client needs to listen to; essentially just chat.
-			//also.... page updates. Register a handler to update.<sessionID>
-			//and then write a method that infers a session ID from a character. char -> user -> session
-			
-			List<MessageConsumer<Object>> consumers = new ArrayList<>();
-			
 			/**
-			 * I need to think about this. Many of the chat channels will be state dependant.
-			 * I'm thinking that we will give each socket a "chat.out" consumer, and then validate the message in that handler.
-			 * 
-			 * A formatted message has been received. Pipe it to the client.
-			 */
-			consumers.add(vertx.eventBus().consumer("chat.out", handler -> {
-				JsonObject message = (JsonObject) handler.body(); //TODO codec
-				
-				JsonObject outgoing = new JsonObject();
-				outgoing.put("type", "chat");
-				outgoing.put("message", message.getString("message"));
-				outgoing.put("sender", message.getString("sender"));
-				outgoing.put("channel", message.getString("channel"));
-				
-				//We then need to evaluate if this message should actually be retrieved. CRIPES this is gonna be inefficient.
-				
-				socket.write(Json.encodeToBuffer(outgoing));
-				
-			}));
-
-			
-			//Client update
-			consumers.add(vertx.eventBus().consumer("update." + newSession.getId(), handler -> {
-				JsonObject outgoing = (JsonObject) handler.body();
-				
-				socket.write(Json.encodeToBuffer(outgoing));
-				
-			}));
-			
-			/**
-			 * Whenever a user disconnects, this handlers get called.
+			 * Whenever a user disconnects, this handler get called.
 			 * We unregister all of their handlers, so the event bus doesn't bloat.
 			 * We also delete their session.
 			 */
@@ -166,11 +149,11 @@ public class MainVerticle extends AbstractVerticle{
 				for(MessageConsumer<Object> mc : consumers)
 					unregisterConsumer(mc);
 				
-				db.doTransaction(() -> {
-					db.delete(sessionKey);
-				});
+				DBService scopeDB = new DBService(client);
 				
-				//
+				scopeDB.doTransaction(() -> {
+					scopeDB.delete(sessionKey);
+				});
 			});
 		});
 		
@@ -186,6 +169,34 @@ public class MainVerticle extends AbstractVerticle{
 	}
 	
 	/**
+	 * Generates and then registers the appropriate EventBus handlers given the user's game state.
+	 * For example; every time the user moves to a new "State", their location chat will swap.
+	 * @param cs
+	 * @param socket
+	 * @return
+	 */
+	public List<MessageConsumer<Object>> registerStateHandlers(ChatService cs, NetSocket socket) {
+		
+		//If the user IS NOT authenticated, we register no handlers.
+		if(cs.ctx.session.isAuthenticated() == false) {
+			return new ArrayList<>();
+		}
+		
+		List<MessageConsumer<Object>> result = new ArrayList<>();
+		
+		//Generate all the state-based handlers for this session.
+		Map<String, Handler<Message<Object>>> handlers = cs.generateStateHandlers(socket);
+		
+		for(Entry<String, Handler<Message<Object>>> entry : handlers.entrySet()) {
+			String address = entry.getKey();
+			//register the new handlers.
+			result.add(vertx.eventBus().consumer(address, entry.getValue()));
+		}
+		
+		return result;
+	}
+	
+	/**
 	 * Generate an action.
 	 * @param <A>
 	 * @param actionName
@@ -193,7 +204,7 @@ public class MainVerticle extends AbstractVerticle{
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
-	public <A extends Action> A generateAction(String actionName, Context ctx) {
+	public <A extends Action> A generateAction(String actionName, GameContext ctx) {
 		switch(actionName) {
 		case "login":
 			return (A) new Login(ctx);
@@ -203,7 +214,7 @@ public class MainVerticle extends AbstractVerticle{
 			throw new IllegalArgumentException("Action " + actionName + " not supported by generateAction()");
 		}
 	}
-	
+		
 	/**
 	 * 
 	 * Unregisters a consumer from the event bus. Automatically retries to ensure the consumer gets cleaned up.

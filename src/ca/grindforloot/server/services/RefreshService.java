@@ -1,13 +1,13 @@
 package ca.grindforloot.server.services;
 
-import ca.grindforloot.server.Context;
+import ca.grindforloot.server.GameContext;
 import ca.grindforloot.server.entities.Being;
 import ca.grindforloot.server.entities.User;
 import io.vertx.core.json.JsonObject;
 
 public class RefreshService extends Service{
 
-	public RefreshService(Context context) {
+	public RefreshService(GameContext context) {
 		super(context);
 	}
 	

@@ -1,6 +1,6 @@
 package ca.grindforloot.server.actions;
 
-import ca.grindforloot.server.Context;
+import ca.grindforloot.server.GameContext;
 import ca.grindforloot.server.db.QueryService;
 import ca.grindforloot.server.db.QueryService.FilterOperator;
 import ca.grindforloot.server.entities.EntityService;
@@ -10,7 +10,7 @@ import ca.grindforloot.server.errors.UserError;
 
 public class Signup extends Action{
 	
-	public Signup(Context context) {
+	public Signup(GameContext context) {
 		super(context);
 		// TODO Auto-generated constructor stub
 	}
