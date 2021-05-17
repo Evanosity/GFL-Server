@@ -4,7 +4,7 @@ import ca.grindforloot.server.Context;
 import ca.grindforloot.server.db.QueryService;
 import ca.grindforloot.server.db.QueryService.FilterOperator;
 import ca.grindforloot.server.entities.EntityService;
-import ca.grindforloot.server.entities.Character;
+import ca.grindforloot.server.entities.Being;
 import ca.grindforloot.server.entities.User;
 import ca.grindforloot.server.errors.UserError;
 
@@ -36,7 +36,7 @@ public class Signup extends Action{
 		user.setEmail(email);
 		user.setPassword(hashedPassword);
 		
-		Character character = es.createEntity("Character");
+		Being character = es.createEntity("Character");
 		
 		db.put(user, character);
 		

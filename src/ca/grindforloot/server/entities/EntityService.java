@@ -49,7 +49,7 @@ public class EntityService {
 		T result = null;
 		switch(key.getType()) {
 			case "Character":
-				result = (T) new Character(db, doc, isNew, projections);
+				result = (T) new Being(db, doc, isNew, projections);
 				break;
 			case "User":
 				result = (T) new User(db, doc, isNew, projections);

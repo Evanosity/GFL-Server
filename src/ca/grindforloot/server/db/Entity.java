@@ -40,6 +40,8 @@ public abstract class Entity {
 	//entity with projections. Here, it's implied that the entity is NOT new.
 	protected Entity(DBService db, Document raw, Set<String> projections) {
 		this(db, raw, false, projections);
+		
+		JsonObject test = new JsonObject(new String());
 	}
 	
 	//internal constructor
@@ -67,9 +69,18 @@ public abstract class Entity {
 	 */
 	public abstract String getType();
 	
-	public boolean projected() {
-		return projections != null && projections.isEmpty();
+	public boolean isNew() {
+		return isNew;
 	}
+	
+	public boolean projected() {
+		return projections != null && false == projections.isEmpty();
+	}
+	
+	/**
+	 * This will return null if no projections were set. or at least it should....
+	 * @return
+	 */
 	public Set<String> getProjections(){
 		return projections;
 	}
@@ -116,9 +127,7 @@ public abstract class Entity {
 		return getKey().getId();
 	}
 	
-	public boolean isNew() {
-		return isNew;
-	}
+
 	
 	/**
 	 * Create a Vert.x JsonObject representation of this entity
@@ -136,7 +145,7 @@ public abstract class Entity {
 	/**
 	 * Convert raw objects into the appropriate storage format for mongodb.
 	 * Notably, {@link Key} -> {@link Document}
-	 * This is its own method because in the cast of lists, it calls itself recursively.
+	 * This is its own method because in the case of lists, it calls itself recursively.
 	 * @param obj
 	 * @return
 	 */

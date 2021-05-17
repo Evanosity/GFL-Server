@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import ca.grindforloot.server.db.DBService;
+import io.vertx.core.Vertx;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.NetSocket;
@@ -18,12 +19,18 @@ import io.vertx.core.net.NetSocket;
  */
 public class Context {
 	private Map<String, Object> attributes;
-	private final NetSocket socket;
-	private final DBService db;
+	public final NetSocket socket;
+	public final DBService db;
+	public final Vertx vertx;
 	
 	private final JsonObject incoming;
 	
-	public Context(NetSocket socket, DBService db, JsonObject incoming) {
+	/**
+	 * @param socket
+	 * @param db
+	 * @param incoming
+	 */
+	public Context(Vertx vertx, NetSocket socket, DBService db, JsonObject incoming) {
 		if(socket == null)
 			throw new IllegalArgumentException("Socket cannot be null.");
 		this.socket = socket;
@@ -35,6 +42,10 @@ public class Context {
 		if(incoming == null)
 			throw new IllegalArgumentException("Incoming cannot be null");
 		this.incoming = incoming;
+		
+		if(vertx == null)
+			throw new IllegalArgumentException("Do I even need these checks?");
+		this.vertx = vertx;
 	}
 	
 	public DBService getDB() {

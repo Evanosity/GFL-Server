@@ -34,7 +34,7 @@ public class QueryService {
 		this.db = db;
 	}
 	
-	public List<Entity> fetchEntites(String type, String field, FilterOperator op, Object value){
+	public <T extends Entity> List<T> fetchEntites(String type, String field, FilterOperator op, Object value){
 		Query q = new Query(type);
 		q.addFilter(field, op, value);
 		
@@ -71,11 +71,20 @@ public class QueryService {
 		return db.db.getCollection(q.getType()).countDocuments(filters);
 	}
 	
+	/**
+	 * Generate a bson projection
+	 * @param projections
+	 * @return
+	 */
 	protected static Bson generateProjections(Set<String> projections) {
-		
 		return Projections.include(projections.toArray(new String[projections.size()]));	
 	}
 	
+	/**
+	 * Generate a bson update
+	 * @param updates
+	 * @return
+	 */
 	protected static Bson generateUpdates(Map<String, Object> updates) {
 		List<Bson> bsonUpdates = new ArrayList<>();
 		
