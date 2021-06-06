@@ -101,16 +101,19 @@ public class GameContext {
 	/**
 	 * Generates and then registers the appropriate EventBus handlers given the user's game state.
 	 * For example; every time the user moves to a new "State", their location chat will swap.
-	 * @param cs
-	 * @param socket
+	 * This method also unregisters all of the current handlers
+	 * @param current - the current set of handlers, to be unregistered.
 	 * @return
 	 */
-	public List<MessageConsumer<Object>> replaceStateHandlers() {
+	public List<MessageConsumer<Object>> replaceStateHandlers(List<MessageConsumer<Object>> current) {
 		
 		//If the user IS NOT authenticated, we register no handlers.
 		if(session.isAuthenticated() == false) {
-			return new ArrayList<>();
+			return new ArrayList<>(); //TODO do we replace this w `return current;`
 		}
+		
+		for(MessageConsumer<Object> mc : current)
+			unregisterConsumer(mc);
 		
 		List<MessageConsumer<Object>> result = new ArrayList<>();
 		
@@ -119,7 +122,7 @@ public class GameContext {
 		
 		for(Entry<String, Handler<Message<Object>>> entry : handlers.entrySet()) {
 			String address = entry.getKey();
-			//register the new handlers.
+			//register the new handler
 			result.add(vertx.eventBus().consumer(address, entry.getValue()));
 		}
 		
@@ -172,6 +175,21 @@ public class GameContext {
 		return result;
 	}
 	
+	/**
+	 * 
+	 * Unregisters a consumer from the event bus. Automatically retries to ensure the consumer gets cleaned up.
+	 * Why would it fail? Who knows, and I ain't finding out.
+	 * @param mc
+	 */
+	private void unregisterConsumer(MessageConsumer<Object> mc) {
+		mc.unregister(result -> {
+			if(result.succeeded())
+				return;
+			else
+				vertx.setTimer(5000, id -> unregisterConsumer(mc));
+		});
+		
+	}
 	
 	/**
 	 * Reply to this action.

@@ -13,7 +13,7 @@ import io.vertx.core.json.JsonObject;
  * 
  * All subclasses should implement every constructor.
  * 
- * You do NOT need to provide a key object to this entity; it gets generated upon creation.
+ * You do NOT need to provide a key object to this entity; it gets generated from the document.
  * 
  * @author Evan
  *
@@ -127,8 +127,6 @@ public abstract class Entity {
 	public String getId() {
 		return getKey().getId();
 	}
-	
-
 	
 	/**
 	 * Create a Vert.x JsonObject representation of this entity

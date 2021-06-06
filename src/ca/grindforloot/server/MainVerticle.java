@@ -1,6 +1,7 @@
 package ca.grindforloot.server;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -19,9 +20,11 @@ import ca.grindforloot.server.entities.EntityService;
 import ca.grindforloot.server.entities.Session;
 import ca.grindforloot.server.errors.UserError;
 import ca.grindforloot.server.services.ChatService;
+import ca.grindforloot.server.services.ScriptService;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.eventbus.MessageConsumer;
+import io.vertx.core.eventbus.impl.codecs.JsonObjectMessageCodec;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
@@ -38,19 +41,45 @@ public class MainVerticle extends AbstractVerticle{
 		
 		Vertx vertx = Vertx.vertx();
 		
+		EventBus eb = vertx.eventBus();
+				
+		//TODO figure out codecs
+		//eb.registerDefaultCodec(JsonObject.class, new JsonObjectMessageCodec());
+		
+		Map<String, Object> globalContext = new HashMap<>();
+		globalContext.put("global", "Evan is the best - ");
+		
+		ScriptService.init(globalContext);
+		
+		Handler<Long> scriptHandler = id -> {
+			Map<String, Object> context = new HashMap<>();
+			context.put("test", id);
+			
+			try {
+				ScriptService.interpret("var x = new java.lang.Long(1); print(global + test + x);", context);
+			}
+			catch(Throwable e) {
+				System.out.println(e.getMessage());
+				System.out.println(e.getCause().getClass());
+				vertx.close();
+			}
+		};
+		
+		vertx.setPeriodic(500, id -> {
+			vertx.setTimer(1000, scriptHandler);
+		});
+		vertx.setPeriodic(1000, id -> {
+			vertx.setTimer(750, scriptHandler);
+		});
+
+		/*
+		
 		//client = MongoClients.create("");
 		
-		EventBus eb = vertx.eventBus();
-		
-		//TODO figure out codecs
-		eb.registerDefaultCodec(JsonObject.class, null);
-		
-		vertx.deployVerticle(new MainVerticle(), id -> {
-			//do nothing with it
-		});
+
 		
 		System.out.println(new ObjectId());
-		
+		*/
 	}
 	
 	/**
@@ -84,6 +113,9 @@ public class MainVerticle extends AbstractVerticle{
 				
 				DBService db = new DBService(client);
 				
+				/**
+				 * the session info should come from the client. This will save memory on the server
+				 */
 				Session session = db.getEntity(sessionKey);
 				
 				//Compose the context object. This gets passed to every action and service.
@@ -103,14 +135,8 @@ public class MainVerticle extends AbstractVerticle{
 						
 						action.perform();
 						
-						//rid ourselves of the old consumers.
-						consumers.removeIf(consumer -> {
-							unregisterConsumer(consumer);
-							return consumer != null;
-						});
-						
-						//generate the new consumers.
-						consumers.addAll(ctx.replaceStateHandlers());
+						//Generate the new eventbus consumers for this user
+						ctx.replaceStateHandlers(consumers);
 						
 						break;
 						
@@ -178,15 +204,19 @@ public class MainVerticle extends AbstractVerticle{
 				for(MessageConsumer<Object> mc : consumers)
 					unregisterConsumer(mc);
 				
+				Key scopeSessionKey = null; //TODO infer their key, so there's no leftover memory. I think?
+				//I need to put a lot of thought into session validation
+				
 				DBService scopeDB = new DBService(client);
 				
 				scopeDB.doTransaction(() -> {
-					scopeDB.delete(sessionKey);
+					scopeDB.delete(scopeSessionKey);
 				});
 			});
 		});
 		
 		//TODO cron jobs? Decide if I'll make an XML file or do them all programatically.
+		//Cron jobs will probably be scripts. Also, this can't be inside a verticle because I don't want cron jobs to scale.
 		
 		//TODO environment variables
 		server.listen(8080, "0.0.0.0", res -> {
@@ -195,6 +225,10 @@ public class MainVerticle extends AbstractVerticle{
 			else
 				System.out.println("Server failed to start");
 		});
+	}
+	
+	public void accept(Object object) {
+		object.toString();
 	}
 	
 	/**
@@ -211,6 +245,7 @@ public class MainVerticle extends AbstractVerticle{
 			return (T) new Login(ctx);
 		case "signup":
 			return (T) new Signup(ctx);
+		case "combat-escape":
 		default:
 			throw new IllegalArgumentException("Action " + actionName + " not supported by generateAction()");
 		}
@@ -233,23 +268,5 @@ public class MainVerticle extends AbstractVerticle{
 		}
 	}
 		
-	/**
-	 * 
-	 * Unregisters a consumer from the event bus. Automatically retries to ensure the consumer gets cleaned up.
-	 * Why would it fail? Who knows, and I ain't finding out.
-	 * @param mc
-	 */
-	public void unregisterConsumer(MessageConsumer<Object> mc) {
-		mc.unregister(result -> {
-			if(result.succeeded())
-				return;
-			else
-				//in the event of a looping failure, we dont want to bog down this thread.
-				//this is a textbook bandaid fix
-				vertx.setTimer(5000, handler -> {
-					unregisterConsumer(mc);
-				});
-		});
-		
-	}
+
 }

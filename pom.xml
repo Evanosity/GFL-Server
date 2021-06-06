@@ -24,7 +24,7 @@
 			<artifactId>vertx-core</artifactId>
 			<version>4.0.3</version>
 		</dependency>
-		<dependency>
+		<dependency> <!-- Likely not needed -->
 			<groupId>io.vertx</groupId>
 			<artifactId>vertx-web</artifactId>
 			<version>4.0.3</version>
@@ -33,6 +33,21 @@
 			<groupId>org.mongodb</groupId>
 			<artifactId>mongodb-driver-sync</artifactId>
 			<version>4.1.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.openjdk.nashorn</groupId>
+			<artifactId>nashorn-core</artifactId>
+			<version>15.2</version>
+		</dependency>
+		<dependency>
+			<groupId>com.discord4j</groupId>
+			<artifactId>discord4j-core</artifactId>
+			<version>3.1.5</version>
+		</dependency>
+		<dependency> <!-- I wonder why this doesnt work -->
+			<groupId>org.python</groupId>
+			<artifactId>jython</artifactId>
+			<version>2.7.0</version>
 		</dependency>
 	</dependencies>
 </project>

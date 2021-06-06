@@ -39,7 +39,6 @@ public class DBService {
 	protected final MongoDatabase db;
 	private final EntityService entityService;
 	
-	//TODO test if we can pass this in as null.
 	protected ClientSession session = null;
 	
 	public DBService(MongoClient client) {
@@ -47,8 +46,15 @@ public class DBService {
 		//db = client.getDatabase("GFL");
 		db = null;
 		
+		session = client.startSession();
+		
 		entityService = new EntityService(this);
 		
+	}
+	
+	protected void finalize() {
+		session.close();
+		client.close();
 	}
 	
 	public Key getKey(String type, String id) {
@@ -77,33 +83,23 @@ public class DBService {
 	
 	/**
 	 * Perform an action inside of a mongodb transaction.
-	 * @param action
+	 * This isn't ThreadSafe	 
+	 * 
+	 * @param action - what is being run inside the script context
 	 * @return
 	 */
 	public boolean doTransaction(Runnable action) {
-		session = client.startSession();
-		
-		TransactionBody<Boolean> txn = new TransactionBody<Boolean>() {
-			@Override
-			public Boolean execute() {
-				try {
-					action.run();
-				}
-				catch(Exception e) {
-					return false;
-				}
+		//TODO consider transactionOptions
+		return session.withTransaction(() -> {
+			try {
+				action.run();
 				return true;
 			}
-		};
-		
-		try {
-			//TODO do we need TransactionOptions?
-			return session.withTransaction(txn);
-		}
-		finally {
-			session.close();
-			session = null;
-		}
+			//if any error occurs, we simply report back. Might be worth throwing E instead? TODO
+			catch(Exception e) {
+				return false;
+			}
+		});
 	}
 	
 	/**
@@ -326,16 +322,14 @@ public class DBService {
 	 * @param obj
 	 * @return
 	 */
-	public static Object parseValue(Object obj) {
+	protected static Object parseValue(Object obj) {
 		if(obj instanceof Key) {
 			Key key = (Key) obj;
 			return key.toDocument();
 		}
-		if(obj instanceof List) {			
+		if(obj instanceof List) 		
 			for(Object o : (List<?>) obj) 
 				return parseValue(o);
-			
-		}
 		
 		return obj;
 	}

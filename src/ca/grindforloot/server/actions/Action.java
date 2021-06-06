@@ -1,20 +1,13 @@
 package ca.grindforloot.server.actions;
 
 import ca.grindforloot.server.GameContext;
-import ca.grindforloot.server.db.DBService;
+import ca.grindforloot.server.Request;
 import ca.grindforloot.server.errors.UserError;
-import io.vertx.core.json.JsonObject;
-import io.vertx.core.net.NetSocket;
 
-public abstract class Action {
-	
-	public GameContext ctx;
-	public DBService db;
+public abstract class Action extends Request{
 	
 	public Action(GameContext ctx) {
-		this.ctx = ctx;
-		this.db = ctx.getDB();
-		
+		super(ctx);
 	}
 	/**
 	 * Given the request and response, do something.

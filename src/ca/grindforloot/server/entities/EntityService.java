@@ -54,9 +54,9 @@ public class EntityService {
 		case "Session":
 			result = (T) new Session(db, doc, isNew, projections);
 			break;
-		case "Character":
+		case "Being":
 			result = (T) new Being(db, doc, isNew, projections);
-			break;
+			break; 
 		case "Item":
 			result = (T) new Item(db, doc, isNew, projections);
 			break;
@@ -65,6 +65,9 @@ public class EntityService {
 			break;
 		case "Connection":
 			result = (T) new Connection(db, doc, isNew, projections);
+			break;
+		case "CombatAction":
+			//i imagine these will work comparably to aspects. Infact, what if the ENTIRE combat system was a scripting language
 			break;
 		default:
 			throw new IllegalArgumentException("Entity type" + key.getType() + " is not supported.");
