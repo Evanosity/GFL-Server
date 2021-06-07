@@ -52,6 +52,13 @@ public class Query {
 		return this;
 	}
 	
+	public Query addProjections(String...properties) {
+		for(String s : properties)
+			projections.add(s);
+		
+		return this;
+	}
+	
 	public Query addProjection(String propertyName) {
 		projections.add(propertyName);
 		

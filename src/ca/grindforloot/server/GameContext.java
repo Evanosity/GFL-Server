@@ -10,6 +10,7 @@ import ca.grindforloot.server.db.DBService;
 import ca.grindforloot.server.entities.Being;
 import ca.grindforloot.server.entities.Session;
 import ca.grindforloot.server.entities.User;
+import ca.grindforloot.server.services.EventBusService;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.Message;
@@ -112,8 +113,10 @@ public class GameContext {
 			return new ArrayList<>(); //TODO do we replace this w `return current;`
 		}
 		
+		EventBusService service = new EventBusService(vertx);
+		
 		for(MessageConsumer<Object> mc : current)
-			unregisterConsumer(mc);
+			service.unregisterConsumer(mc);
 		
 		List<MessageConsumer<Object>> result = new ArrayList<>();
 		
@@ -129,13 +132,12 @@ public class GameContext {
 		return result;
 	}
 	
-	
 	/**
 	 * Generate an Address-Handler map of all the consumers for this character.
 	 * This should really be in a different service.
 	 * @return
 	 */
-	private Map<String, Handler<Message<Object>>> generateStateHandlers(){
+	public Map<String, Handler<Message<Object>>> generateStateHandlers(){
 		Map<String, Handler<Message<Object>>> result = new HashMap<>();
 		
 		//register their client for all the listeners necessary for each client
@@ -174,22 +176,7 @@ public class GameContext {
 		
 		return result;
 	}
-	
-	/**
-	 * 
-	 * Unregisters a consumer from the event bus. Automatically retries to ensure the consumer gets cleaned up.
-	 * Why would it fail? Who knows, and I ain't finding out.
-	 * @param mc
-	 */
-	private void unregisterConsumer(MessageConsumer<Object> mc) {
-		mc.unregister(result -> {
-			if(result.succeeded())
-				return;
-			else
-				vertx.setTimer(5000, id -> unregisterConsumer(mc));
-		});
-		
-	}
+
 	
 	/**
 	 * Reply to this action.

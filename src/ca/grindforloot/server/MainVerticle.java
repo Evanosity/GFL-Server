@@ -4,9 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-
-import org.bson.types.ObjectId;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.mongodb.client.MongoClient;
 
@@ -16,26 +14,36 @@ import ca.grindforloot.server.actions.Signup;
 import ca.grindforloot.server.controllers.Controller;
 import ca.grindforloot.server.db.DBService;
 import ca.grindforloot.server.db.Key;
+import ca.grindforloot.server.db.Query;
+import ca.grindforloot.server.db.QueryService;
+import ca.grindforloot.server.db.QueryService.FilterOperator;
 import ca.grindforloot.server.entities.EntityService;
+import ca.grindforloot.server.entities.Script;
 import ca.grindforloot.server.entities.Session;
 import ca.grindforloot.server.errors.UserError;
 import ca.grindforloot.server.services.ChatService;
+import ca.grindforloot.server.services.EventBusService;
 import ca.grindforloot.server.services.ScriptService;
+
 import io.vertx.core.eventbus.EventBus;
-import io.vertx.core.eventbus.Message;
 import io.vertx.core.eventbus.MessageConsumer;
-import io.vertx.core.eventbus.impl.codecs.JsonObjectMessageCodec;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.NetServer;
-import io.vertx.core.net.NetSocket;
 
 public class MainVerticle extends AbstractVerticle{
 	
 	protected static MongoClient client = null;
+	
+	/**
+	 * A map of all active cron jobs.
+	 * Key - the timer ID
+	 * Value - the key of the script entity
+	 */
+	private static Map<Long, Key> cronJobs = new ConcurrentHashMap<>();
 	
 	public static void main(String[]args) {
 		
@@ -64,12 +72,57 @@ public class MainVerticle extends AbstractVerticle{
 				vertx.close();
 			}
 		};
-		
 		vertx.setPeriodic(500, id -> {
 			vertx.setTimer(1000, scriptHandler);
 		});
 		vertx.setPeriodic(1000, id -> {
 			vertx.setTimer(750, scriptHandler);
+		});
+		
+		
+		/**
+		 * CRON JOBS
+		 * 
+		 * This should probably be its own service
+		 */
+		
+		
+		DBService db = new DBService(client);
+		QueryService qs = new QueryService(db);
+		
+		Query q = new Query("Script").addFilter("cron", FilterOperator.NOT_EQUAL, null);
+		q.addProjections("_id", "cron");
+		
+		List<Script> cronScripts = qs.runEntityQuery(q);
+		
+		for(Script s : cronScripts) {
+			Key key = s.getKey();
+			
+			Long periodicId = vertx.setPeriodic(s.getCronTimer(), getCronHandler(vertx));
+			
+			cronJobs.put(periodicId, key);
+		}
+		
+		//Once every hour, discover new cron jobs
+		vertx.setPeriodic(3600000, id -> {
+			DBService scopeDB = new DBService(client);
+			QueryService scopeQs = new QueryService(scopeDB);
+			
+			Query query = new Query("Script").addFilter("cron", FilterOperator.NOT_EQUAL, null);
+			q.addProjections("_id", "cron");
+			
+			List<Script> scripts = scopeQs.runEntityQuery(query);
+			
+			for(Script sc : scripts) {
+				if(cronJobs.containsValue(sc.getKey()))
+					continue;
+				
+				//If it does not already exist, register it.
+				Long timerId = vertx.setPeriodic(sc.getCronTimer(), getCronHandler(vertx));
+				
+				cronJobs.put(timerId, sc.getKey());
+			}
+
 		});
 
 		/*
@@ -80,6 +133,37 @@ public class MainVerticle extends AbstractVerticle{
 		
 		System.out.println(new ObjectId());
 		*/
+	}
+	
+	/**
+	 * Generate the cron job handler
+	 * @param vertx
+	 * @return
+	 */
+	public static Handler<Long> getCronHandler(Vertx vertx){
+		return id -> vertx.executeBlocking(promise -> {
+			try {
+				DBService scopeDB = new DBService(client);
+				
+				Script script = scopeDB.getEntity(cronJobs.get(id));
+				
+				if(script.getCronTimer() == 0) {
+					
+					vertx.cancelTimer(id);
+					cronJobs.remove(id);
+					
+					promise.fail("Cron job cancelled.");
+				}
+				
+				ScriptService.interpret(script, null);
+				
+				promise.complete();
+			}
+			catch(Throwable e) {
+				promise.fail("Interrupted during cron job id" + id + ": " + e.toString());
+			}
+			
+		}, false);
 	}
 	
 	/**
@@ -200,9 +284,10 @@ public class MainVerticle extends AbstractVerticle{
 			 * We unregister all of their handlers, so the event bus doesn't bloat.
 			 * We also delete their session. TODO do we reallllly need to do that?
 			 */
-			socket.closeHandler(handler -> {				
+			socket.closeHandler(handler -> {
+				EventBusService service = new EventBusService(vertx);
 				for(MessageConsumer<Object> mc : consumers)
-					unregisterConsumer(mc);
+					service.unregisterConsumer(mc);
 				
 				Key scopeSessionKey = null; //TODO infer their key, so there's no leftover memory. I think?
 				//I need to put a lot of thought into session validation
@@ -225,10 +310,6 @@ public class MainVerticle extends AbstractVerticle{
 			else
 				System.out.println("Server failed to start");
 		});
-	}
-	
-	public void accept(Object object) {
-		object.toString();
 	}
 	
 	/**
@@ -262,7 +343,7 @@ public class MainVerticle extends AbstractVerticle{
 	public <T extends Controller> T generateController(String controllerName, GameContext ctx) {
 		switch(controllerName) {
 		case "item":
-			return (T) new Controller(ctx);
+			//return (T) new Controller(ctx);
 		default:
 			throw new IllegalArgumentException("Controller " + controllerName + " not supported by generateController()");
 		}

@@ -11,6 +11,8 @@ import javax.script.ScriptException;
 import org.openjdk.nashorn.api.scripting.ClassFilter;
 import org.openjdk.nashorn.api.scripting.NashornScriptEngineFactory;
 
+import ca.grindforloot.server.db.DBService;
+import ca.grindforloot.server.entities.Script;
 import ca.grindforloot.server.errors.UserError;
 
 public class ScriptService {
@@ -40,6 +42,16 @@ public class ScriptService {
 		
 		Bindings global = fillBindings(engine.getBindings(ScriptContext.GLOBAL_SCOPE), contextMap);
 		engine.setBindings(global, ScriptContext.GLOBAL_SCOPE);
+	}
+	
+	/**
+	 * Interpret a script entity
+	 * @param script
+	 * @param context
+	 * @throws UserError
+	 */
+	public static void interpret(Script script, Map<String, Object> context) throws UserError {	
+		interpret(script.getScript(), context);
 	}
 	
 	/**
