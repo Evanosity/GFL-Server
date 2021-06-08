@@ -24,7 +24,7 @@ import ca.grindforloot.server.errors.UserError;
 import ca.grindforloot.server.services.ChatService;
 import ca.grindforloot.server.services.EventBusService;
 import ca.grindforloot.server.services.ScriptService;
-
+import ca.grindforloot.server.services.TimerService;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.AbstractVerticle;
@@ -37,17 +37,17 @@ import io.vertx.core.net.NetServer;
 public class MainVerticle extends AbstractVerticle{
 	
 	protected static MongoClient client = null;
+	protected static Vertx vertx = null;
 	
 	/**
 	 * A map of all active cron jobs.
 	 * Key - the timer ID
 	 * Value - the key of the script entity
 	 */
-	private static Map<Long, Key> cronJobs = new ConcurrentHashMap<>();
 	
 	public static void main(String[]args) {
 		
-		Vertx vertx = Vertx.vertx();
+		vertx = Vertx.vertx();
 		
 		EventBus eb = vertx.eventBus();
 				
@@ -58,6 +58,7 @@ public class MainVerticle extends AbstractVerticle{
 		globalContext.put("global", "Evan is the best - ");
 		
 		ScriptService.init(globalContext);
+		TimerService.init(client, vertx);
 		
 		Handler<Long> scriptHandler = id -> {
 			Map<String, Object> context = new HashMap<>();
@@ -78,92 +79,11 @@ public class MainVerticle extends AbstractVerticle{
 		vertx.setPeriodic(1000, id -> {
 			vertx.setTimer(750, scriptHandler);
 		});
-		
-		
-		/**
-		 * CRON JOBS
-		 * 
-		 * This should probably be its own service
-		 */
-		
-		
-		DBService db = new DBService(client);
-		QueryService qs = new QueryService(db);
-		
-		Query q = new Query("Script").addFilter("cron", FilterOperator.NOT_EQUAL, null);
-		q.addProjections("_id", "cron");
-		
-		List<Script> cronScripts = qs.runEntityQuery(q);
-		
-		for(Script s : cronScripts) {
-			Key key = s.getKey();
-			
-			Long periodicId = vertx.setPeriodic(s.getCronTimer(), getCronHandler(vertx));
-			
-			cronJobs.put(periodicId, key);
-		}
-		
-		//Once every hour, discover new cron jobs
-		vertx.setPeriodic(3600000, id -> {
-			DBService scopeDB = new DBService(client);
-			QueryService scopeQs = new QueryService(scopeDB);
-			
-			Query query = new Query("Script").addFilter("cron", FilterOperator.NOT_EQUAL, null);
-			q.addProjections("_id", "cron");
-			
-			List<Script> scripts = scopeQs.runEntityQuery(query);
-			
-			for(Script sc : scripts) {
-				if(cronJobs.containsValue(sc.getKey()))
-					continue;
-				
-				//If it does not already exist, register it.
-				Long timerId = vertx.setPeriodic(sc.getCronTimer(), getCronHandler(vertx));
-				
-				cronJobs.put(timerId, sc.getKey());
-			}
-
-		});
 
 		/*
-		
-		//client = MongoClients.create("");
-		
-
-		
+		client = MongoClients.create("");
 		System.out.println(new ObjectId());
 		*/
-	}
-	
-	/**
-	 * Generate the cron job handler
-	 * @param vertx
-	 * @return
-	 */
-	public static Handler<Long> getCronHandler(Vertx vertx){
-		return id -> vertx.executeBlocking(promise -> {
-			try {
-				DBService scopeDB = new DBService(client);
-				
-				Script script = scopeDB.getEntity(cronJobs.get(id));
-				
-				if(script.getCronTimer() == 0) {
-					
-					vertx.cancelTimer(id);
-					cronJobs.remove(id);
-					
-					promise.fail("Cron job cancelled.");
-				}
-				
-				ScriptService.interpret(script, null);
-				
-				promise.complete();
-			}
-			catch(Throwable e) {
-				promise.fail("Interrupted during cron job id" + id + ": " + e.toString());
-			}
-			
-		}, false);
 	}
 	
 	/**
@@ -300,9 +220,6 @@ public class MainVerticle extends AbstractVerticle{
 			});
 		});
 		
-		//TODO cron jobs? Decide if I'll make an XML file or do them all programatically.
-		//Cron jobs will probably be scripts. Also, this can't be inside a verticle because I don't want cron jobs to scale.
-		
 		//TODO environment variables
 		server.listen(8080, "0.0.0.0", res -> {
 			if(res.succeeded())
@@ -348,6 +265,4 @@ public class MainVerticle extends AbstractVerticle{
 			throw new IllegalArgumentException("Controller " + controllerName + " not supported by generateController()");
 		}
 	}
-		
-
 }

@@ -11,7 +11,6 @@ import javax.script.ScriptException;
 import org.openjdk.nashorn.api.scripting.ClassFilter;
 import org.openjdk.nashorn.api.scripting.NashornScriptEngineFactory;
 
-import ca.grindforloot.server.db.DBService;
 import ca.grindforloot.server.entities.Script;
 import ca.grindforloot.server.errors.UserError;
 
