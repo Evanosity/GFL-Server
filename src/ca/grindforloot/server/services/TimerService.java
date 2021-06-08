@@ -149,11 +149,12 @@ public class TimerService {
 	 */
 	private Handler<Long> getCronHandler(Vertx vertx){
 		return id -> vertx.executeBlocking(promise -> {
+			
+			DBService db = new DBService(client);
+			
+			Script script = db.getEntity(cronJobs.get(id));
+			
 			try {
-				DBService db = new DBService(client);
-				
-				Script script = db.getEntity(cronJobs.get(id));
-				
 				//If the cron job gets disabled via DB, don't execute it.
 				if(script.getCronTimer() == 0) {
 					
@@ -170,7 +171,7 @@ public class TimerService {
 				}
 			}
 			catch(Throwable e) {
-				promise.fail("Interrupted during cron job id" + id + ": " + e.toString());
+				promise.fail("Interrupted during cron job id" + id + " " + script.getName() + ": " + e.toString());
 			}
 			
 		}, false);

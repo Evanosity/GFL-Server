@@ -40,11 +40,9 @@ public class MainVerticle extends AbstractVerticle{
 	protected static Vertx vertx = null;
 	
 	/**
-	 * A map of all active cron jobs.
-	 * Key - the timer ID
-	 * Value - the key of the script entity
+	 * Initialize the server.
+	 * @param args
 	 */
-	
 	public static void main(String[]args) {
 		
 		vertx = Vertx.vertx();

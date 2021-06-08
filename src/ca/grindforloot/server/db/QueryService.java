@@ -34,20 +34,6 @@ public class QueryService {
 		this.db = db;
 	}
 	
-	public <T extends Entity> List<T> fetchEntities(String type, String field, FilterOperator op, Object value){
-		Query q = new Query(type);
-		q.addFilter(field, op, value);
-		
-		return runEntityQuery(q);
-	}
-	
-	public Long countEntities(String type, String field, FilterOperator op, Object value) {
-		Query q = new Query(type);
-		q.addFilter(field, op, value);
-		
-		return runCount(q);
-	}
-	
 	public <T extends Entity> List<T> runEntityQuery(Query q){	
 		Bson filter = generateCompositeFilter(q.filters); 
 		
